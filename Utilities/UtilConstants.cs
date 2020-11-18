@@ -8,7 +8,7 @@ namespace SER.Utilitties.NetCore.Utilities
 {
     public static class UtilConstants
     {
-        public const string SuperUser = "SuperUser";
+        public const string SuperUser = "Super-User";
         public const string Role = "role";
         public const string Name = "name";
         public const string Subject = "sub";

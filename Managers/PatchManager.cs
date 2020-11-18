@@ -16,8 +16,9 @@ using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Services
 {
-    public class PatchManager<TContext, TRole>
+    public class PatchManager<TContext, TUser, TRole>
         where TContext : DbContext
+        where TUser : class
         where TRole : class
     {
         private readonly TContext _context;
@@ -27,7 +28,7 @@ namespace SER.Utilitties.NetCore.Services
         private string Namespace;
 
         public PatchManager(TContext db,
-            ILogger<PatchManager<TContext, TRole>> logger,
+            ILogger<PatchManager<TContext, TUser, TRole>> logger,
             IConfiguration config,
             IHttpContextAccessor contextAccessor)
         {
@@ -43,10 +44,10 @@ namespace SER.Utilitties.NetCore.Services
             var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == typeof(TContext).Assembly.GetName().Name);
             asm = Assembly.Load(Namespace);
             Type type;
-            //if (model.Model == "User") type = typeof(ApplicationUser);
-            //else if (model.Model == "Role") type = typeof(ApplicationRole);
-
-            type = asm.GetTypes().Where(x => !x.IsAbstract).SingleOrDefault(x => x.Name == model.Model);
+            if (model.Model == "User") type = typeof(TUser);
+            else if (model.Model == "Role") type = typeof(TRole);
+            else
+                type = asm.GetTypes().Where(x => !x.IsAbstract).SingleOrDefault(x => x.Name == model.Model);
             //_logger.LogInformation($"----------------------type {type} model.Model {model.Model }--------------");
             if (type != null)
             {
@@ -75,20 +76,21 @@ namespace SER.Utilitties.NetCore.Services
             var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == typeof(TContext).Assembly.GetName().Name);
             asm = Assembly.Load(Namespace);
             Type type;
-            //if (modelo == "User") type = typeof(ApplicationUser);
-            //else if (modelo == "Role") type = typeof(TRole);
-
-            type = asm.GetTypes().Where(x => !x.IsAbstract).SingleOrDefault(x => x.Name == modelo);
+            if (modelo == "User") type = typeof(TUser);
+            else if (modelo == "Role") type = typeof(TRole);
+            else
+                type = asm.GetTypes().Where(x => !x.IsAbstract).SingleOrDefault(x => x.Name == modelo);
             var permission = modelo.ToLower();
-            //  _logger.LogInformation($"----------------------type {type} model.Model { modelo } permission {permission}--------------");
+            // _logger.LogInformation($"----------------------type {type} model.Model { modelo } permission {permission}--------------");
             if (type != null)
             {
                 if (!GetRolesUser().Contains(UtilConstants.SuperUser)
                     && !_context.Set<TRole>()
-                        .Include("Claims")
-                        .Where("@0.Contains(Name)", GetRolesUser()) // x => GetRolesUser().Contains(x.Name))
-                        .SelectMany("Claims")
-                        .Any($"ClaimValue == { permission }.update"))
+                    .Include("Claims")
+                    .Where("@0.Contains(Name)", GetRolesUser()) // x => GetRolesUser().Contains(x.Name))
+                    .SelectMany("Claims")
+                    .Any($"ClaimValue == @0", $"{ permission }.update")
+                    )
                     return false;
                 try
                 {

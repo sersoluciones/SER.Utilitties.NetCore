@@ -125,15 +125,17 @@ namespace SER.Utilitties.NetCore.Managers
                 new JsonSerializerOptions { WriteIndented = true, });
 
 
-            //await SendMsgSignalR(json);
+            await SendMsgSignalR(json);
             //if (commit) await context.SaveChangesAsync();
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async Task SendMsgSignalR(string msg)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            if (GetCurrenUserName() != null)
-                await _hub.Clients.User(GetCurrenUserName())
-                    .SendAsync("ReceiveMessage", msg);
+            //if (GetCurrenUserName() != null)
+            //    await _hub.Clients.User(GetCurrenUserName())
+            //        .SendAsync("ReceiveMessage", msg);
         }
 
 

@@ -565,7 +565,7 @@ namespace SER.Utilitties.NetCore.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical("Error {0} {1} {2}\n{3}", ex.Message, ex.StackTrace, ex.Data, ex.InnerException);
-                    throw ex;
+                    throw;
                 }
                 finally
                 {
