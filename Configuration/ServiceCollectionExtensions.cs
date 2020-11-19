@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SER.Utilitties.NetCore.SerRest;
 using SER.Utilitties.NetCore.Managers;
 using SER.Utilitties.NetCore.Utilities;
+using SER.AmazonS3;
 
 namespace SER.Utilitties.NetCore.Configuration
 {
@@ -19,9 +20,13 @@ namespace SER.Utilitties.NetCore.Configuration
         public static void AddSerUtilites<TContext>(this IServiceCollection services)
           where TContext : DbContext
         {
-            services.AddSingleton<Consume>();
-            services.AddScoped<AuditManager>();
+            services.AddScoped<AuditManager>();          
+            services.AddScoped<AmazonFileService>();
+
+            services.AddSingleton<PostgresQLService>();
             services.AddSingleton<XlsxHelpers>();
+            services.AddSingleton<ExcelService>();
+            services.AddSingleton<Consume>();
 
             AddScopedModelsDynamic<TContext>(services);
         }

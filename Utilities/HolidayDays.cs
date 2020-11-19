@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Utilities
 {
-    class HolidayDays
+    public static class HolidayDays
     {
         public static List<Holidays> DiasFestivos(int Anio)
         {
