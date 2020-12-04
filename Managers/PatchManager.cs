@@ -6,6 +6,7 @@ using SER.Utilitties.NetCore.Models;
 using SER.Utilitties.NetCore.Utilities;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
@@ -70,6 +71,18 @@ namespace SER.Utilitties.NetCore.Services
             return true;
         }
 
+        public static List<UpdatePermission> GetOtherPermissions()
+        {
+            try
+            {
+                var jsonString = File.ReadAllText("permissions.graphql.json");
+                return JsonSerializer.Deserialize<List<UpdatePermission>>(jsonString);
+            }
+            catch (Exception) { }
+
+            return new List<UpdatePermission>();
+        }
+
         public async Task<object> ReplacePatch(string id, SerPatchModel model, bool isList = false)
         {
             var modelo = isList ? model.Path.Split("/")[^3] : model.Path.Split("/")[^2];
@@ -84,12 +97,17 @@ namespace SER.Utilitties.NetCore.Services
             // _logger.LogInformation($"----------------------type {type} model.Model { modelo } permission {permission}--------------");
             if (type != null)
             {
+                var otherPermissions = GetOtherPermissions();
+                otherPermissions = otherPermissions.Where(x => x.Name == permission).ToList();
+                var userPermissions = new List<string> { $"{ permission }.update" };
+                userPermissions.AddRange(otherPermissions.SelectMany(x => x.Permissions).ToList());
+                //_logger.LogInformation($"----------------------userPermissions {string.Join(", ", userPermissions)}");
                 if (!GetRolesUser().Contains(UtilConstants.SuperUser)
                     && !_context.Set<TRole>()
                     .Include("Claims")
                     .Where("@0.Contains(Name)", GetRolesUser()) // x => GetRolesUser().Contains(x.Name))
                     .SelectMany("Claims")
-                    .Any($"ClaimValue == @0", $"{ permission }.update")
+                    .Any($"@0.Contains(ClaimValue)", userPermissions)
                     )
                     return false;
                 try
