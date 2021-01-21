@@ -392,7 +392,7 @@ namespace SER.Utilitties.NetCore.Services
 
         public async Task<string> GetDataFromDBAsync(string query, Dictionary<string, object> Params = null,
          string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true, string take = null, string page = null,
-         string queryCount = "", string connection = null)
+         string queryCount = null, string connection = null)
         {
             string SqlConnectionStr = _config.GetConnectionString(connection ?? "PsqlConnection");
 
