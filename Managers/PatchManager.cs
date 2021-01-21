@@ -100,7 +100,7 @@ namespace SER.Utilitties.NetCore.Services
                 var otherPermissions = GetOtherPermissions();
                 otherPermissions = otherPermissions.Where(x => x.Name == permission).ToList();
                 var userPermissions = new List<string> { $"{ permission }.update" };
-                userPermissions.AddRange(otherPermissions.SelectMany(x => x.Permissions).ToList());
+                userPermissions.AddRange(otherPermissions.SelectMany(x => x.Permissions.Update).ToList());
                 //_logger.LogInformation($"----------------------userPermissions {string.Join(", ", userPermissions)}");
                 if (!GetRolesUser().Contains(UtilConstants.SuperUser)
                     && !_context.Set<TRole>()

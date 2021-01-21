@@ -394,7 +394,7 @@ namespace SER.Utilitties.NetCore.Services
          string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true, string take = null, string page = null,
          string queryCount = "", string connection = null)
         {
-            string SqlConnectionStr = _config.GetConnectionString(connection ?? "DefaultConnection");
+            string SqlConnectionStr = _config.GetConnectionString(connection ?? "PsqlConnection");
 
             StringBuilder sb = new StringBuilder();
             string Query = query;
