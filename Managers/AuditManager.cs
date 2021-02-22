@@ -37,17 +37,6 @@ namespace SER.Utilitties.NetCore.Managers
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IMemoryCache _cache;
 
-        public static Dictionary<string, byte> ACTIONS = new Dictionary<string, byte>()
-        {
-            {"READ", 0},
-            {"CREATE", 1},
-            {"UPDATE", 2},
-            {"DELETE", 3},
-            {"EXECUTE", 4},
-            {"LOGIN", 5},
-            {"LOGOUT", 6}
-        };
-
         public AuditManager(
             ILogger<AuditManager> logger,
             IHttpContextAccessor contextAccessor,
@@ -60,10 +49,10 @@ namespace SER.Utilitties.NetCore.Managers
             _hub = hub;
         }
 
-        public async Task AddLog(DbContext context, AuditBinding entity, string id = "", bool commit = false)
+        public async Task<JArray> AddLog(DbContext context, AuditBinding entity, string id = "", bool commit = false)
         {
             context.ChangeTracker.DetectChanges();
-
+            JArray valuesToChange = null;
             var entities = context.ChangeTracker.Entries()
                 .Where(x => x.State == EntityState.Modified
                 || x.State == EntityState.Added
@@ -89,7 +78,8 @@ namespace SER.Utilitties.NetCore.Managers
                     //if (!(new string[] { "Claim" }).ToList().Contains(entity.Object))
                     //    entity.Object = entityName;
                     //entity.Action = UPDATE;
-                    entity.json_observations.Add("Values", AuditEntityModified(change));
+                    valuesToChange = AuditEntityModified(change);
+                    entity.json_observations.Add("Values", valuesToChange);
                 }
 
                 foreach (var delete in entities.Where(p => p.State == EntityState.Deleted))
@@ -113,8 +103,9 @@ namespace SER.Utilitties.NetCore.Managers
                 json_observation = entity.json_observations.ToString(),
                 user_id = userId
             };
-            //if (commit) await Add(log, x => x.id == log.id);
-            //else await _context.Audits.AddAsync(log);
+
+            await context.Set<Audit>().AddAsync(log);
+
             var json = JsonSerializer.Serialize<object>(
                 new
                 {
@@ -124,9 +115,10 @@ namespace SER.Utilitties.NetCore.Managers
                 },
                 new JsonSerializerOptions { WriteIndented = true, });
 
-
             await SendMsgSignalR(json);
-            //if (commit) await context.SaveChangesAsync();
+            if (commit) await context.SaveChangesAsync();
+
+            return valuesToChange;
         }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously

@@ -6,6 +6,7 @@ using SER.Utilitties.NetCore.Models;
 using SER.Utilitties.NetCore.Utilities;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
@@ -218,6 +219,15 @@ namespace SER.Utilitties.NetCore.Services
 
                 try
                 {
+                    Type type = null;
+                    var isList = propertyInfo.PropertyType.Name.Contains("List");
+                    if (isList)
+                        type = propertyInfo.PropertyType.GetGenericArguments().Count() > 0 ?
+                            propertyInfo.PropertyType.GetGenericArguments()[0] : propertyInfo.PropertyType;
+
+                    if (isList && type.BaseType == typeof(object) && value != null)
+                        DeleteRelationsM2M(typeof(T), type, id);
+
                     obj.GetType().GetProperty(propertyInfo.Name)?.SetValue(obj, value, null);
                     await _context.SaveChangesAsync();
                 }
@@ -229,6 +239,73 @@ namespace SER.Utilitties.NetCore.Services
             return obj;
 
         }
+
+        private void DeleteRelationsM2M(Type baseType, Type type, int parentId)
+        {
+            try
+            {
+                GetType()
+                    .GetMethod("DeleteRelations")
+                    .MakeGenericMethod(type)
+                    .Invoke(this, parameters: new object[] { baseType, parentId });
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"ERROR {e.ToString()} type {nameof(type)} parentId {parentId}");
+            }
+        }
+
+        public void DeleteRelations<M>(Type baseType, int parentId) where M : class
+        {
+            var iQueryable = _context.Set<M>();
+            var keyProperty = typeof(M).GetProperties();
+            var paramFK = "";
+            Type valueType = null;
+
+            foreach (var prop in typeof(M).GetProperties())
+            {
+                var field = prop.PropertyType;
+                if (field.IsGenericType && field.GetGenericTypeDefinition() == typeof(Nullable<>))
+                {
+                    field = field.GetGenericArguments()[0];
+                }
+
+                if (field == baseType)
+                {
+                    paramFK = prop.GetCustomAttributes(true)
+                        .Where(x => x.GetType() == typeof(ForeignKeyAttribute))
+                        .Select(attr => ((ForeignKeyAttribute)attr).Name)
+                        .FirstOrDefault();
+                    valueType = field;
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(paramFK))
+            {
+                valueType = typeof(M).GetProperty(paramFK).PropertyType;
+                var expToEvaluate = EqualPredicate<M>(typeof(M), paramFK, parentId, valueType);
+                iQueryable.RemoveRange(iQueryable.Where(expToEvaluate));
+                // _context.SaveChanges();
+            }
+        }
+
+        private Expression<Func<M, bool>> EqualPredicate<M>(Type type, string propertyName, object value, Type valueType) where M : class
+        {
+            var parameter = Expression.Parameter(type, "x");
+            // x => x.id == value
+            //     |___|
+            var property = Expression.Property(parameter, propertyName);
+
+            // x => x.id == value
+            //             |__|
+            var numberValue = Expression.Convert(Expression.Constant(value), valueType); // Expression.Constant(value);
+
+            // x => x.id == value
+            //|________________|
+            var exp = Expression.Equal(property, numberValue);
+            return Expression.Lambda<Func<M, bool>>(exp, parameter);
+        }
+
 
         public List<string> GetRolesUser()
         {

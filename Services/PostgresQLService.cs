@@ -595,7 +595,7 @@ namespace SER.Utilitties.NetCore.Services
         }
         public async Task<dynamic> GetDataFromDBAsync<E>(string query, Dictionary<string, object> Params = null,
            string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true,
-           bool serialize = false, string connection = null, string prefix = null)
+           bool serialize = false, string connection = null, string prefix = null, string whereArgs = null)
             where E : class
         {
             string SqlConnectionStr = _config.GetConnectionString(connection ?? "PsqlConnection");
@@ -616,7 +616,7 @@ namespace SER.Utilitties.NetCore.Services
                 if (string.IsNullOrEmpty(prefix)) prefix = currentClass.ToLower().First().ToString();
                 var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix);
 
-                if (Params == null)
+                if (Params == null && whereArgs == null)
                 {
                     Params = new Dictionary<string, object>();
                     if (!string.IsNullOrEmpty(clauseWhere))
@@ -627,6 +627,9 @@ namespace SER.Utilitties.NetCore.Services
                     if (!string.IsNullOrEmpty(clauseWhere))
                         Query = string.Format("{0}\nAND ({1})", Query, clauseWhere);
                 }
+
+                if (Params == null)
+                    Params = new Dictionary<string, object>();
 
                 foreach (var param in ParamsRequest)
                     Params.Add(param.Key, param.Value);
@@ -639,11 +642,15 @@ namespace SER.Utilitties.NetCore.Services
                 // Order By
                 if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("order_by")))
                 {
-                    //var initialClass = currentClass.ToLower().First();
-
                     OrderBy = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("order_by")).Value.ToString();
-                    string[] paramsOrderBy = OrderBy.Split(',');
-                    OrderBy = string.Join(", ", paramsOrderBy.Select(x => $"{prefix}." + x.Trim()));
+                    //var initialClass = currentClass.ToLower().First();
+                    string pattern = "\\.";
+                    Match match = Regex.Match(OrderBy, pattern);
+                    if (!match.Success)
+                    {
+                        string[] paramsOrderBy = OrderBy.Split(',');
+                        OrderBy = string.Join(", ", paramsOrderBy.Select(x => $"{prefix}." + x.Trim()));
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(OrderBy))

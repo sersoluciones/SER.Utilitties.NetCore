@@ -196,6 +196,12 @@ namespace SER.Utilitties.NetCore.Services
                     }
                 }
 
+                await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                {
+                    action = AudiState.UPDATE,
+                    objeto = this.model
+                }, id: GetKey(entity));
+
                 _context.Entry(obj).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
