@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using SER.Utilitties.NetCore.Hubs;
 using SER.Utilitties.NetCore.Models;
 using SER.Utilitties.NetCore.Utilities;
@@ -30,6 +29,7 @@ namespace SER.Utilitties.NetCore.Managers
         LOGIN = 5,
         LOGOUT = 6
     }
+
     public class AuditManager
     {
         private readonly ILogger _logger;
@@ -49,10 +49,10 @@ namespace SER.Utilitties.NetCore.Managers
             _hub = hub;
         }
 
-        public async Task<JArray> AddLog(DbContext context, AuditBinding entity, string id = "", bool commit = false)
+        public async Task<string> AddLog(DbContext context, AuditBinding entity, string id = "", bool commit = false)
         {
             context.ChangeTracker.DetectChanges();
-            JArray valuesToChange = null;
+            string valuesToChange = null;
             var entities = context.ChangeTracker.Entries()
                 .Where(x => x.State == EntityState.Modified
                 || x.State == EntityState.Added
@@ -93,13 +93,13 @@ namespace SER.Utilitties.NetCore.Managers
 
             Audit log = new Audit()
             {
-                current_date = DateTime.Now,
-                action = (byte)entity.action,
+                date = DateTime.UtcNow,
+                action = entity.action,
                 objeto = entity.objeto,
                 username = userName,
                 role = string.Join(",", GetRolesUser().ToArray()),
                 json_browser = InfoBrowser(),
-                json_request = infoRequest(),
+                json_request = GetInfoRequest(),
                 json_observation = entity.json_observations.ToString(),
                 user_id = userId
             };
@@ -109,7 +109,7 @@ namespace SER.Utilitties.NetCore.Managers
             var json = JsonSerializer.Serialize<object>(
                 new
                 {
-                    CurrentDate = DateTime.Now,
+                    CurrentDate = DateTime.UtcNow,
                     entity.action,
                     entity.objeto,
                 },
@@ -131,9 +131,9 @@ namespace SER.Utilitties.NetCore.Managers
         }
 
 
-        public JArray AuditEntityModified(EntityEntry objectStateEntry)
+        public string AuditEntityModified(EntityEntry objectStateEntry)
         {
-            JArray jArrayProp = new JArray();
+            var values = new List<AuditUpdate>();
             foreach (var prop in objectStateEntry.OriginalValues.Properties)
             {
                 string originalValue = null;
@@ -142,17 +142,18 @@ namespace SER.Utilitties.NetCore.Managers
                 string currentValue = null;
                 if (objectStateEntry.CurrentValues[prop] != null)
                     currentValue = objectStateEntry.CurrentValues[prop].ToString();
-                JObject jObjectProp = new JObject();
+
                 if (originalValue != currentValue) //Only create a log if the value changes
                 {
-                    jObjectProp.Add("PropertyName", prop.Name);
-                    jObjectProp.Add("OldValue", originalValue);
-                    jObjectProp.Add("NewValue", currentValue);
-                    jArrayProp.Add(jObjectProp);
+                    values.Add(new AuditUpdate
+                    {
+                        PropertyName = prop.Name,
+                        OldValue = originalValue,
+                        NewValue = currentValue,
+                    });
                 }
             }
-            _logger.LogWarning($"json values: {jArrayProp.ToString()}");
-            return jArrayProp;
+            return JsonSerializer.Serialize(values);
         }
 
 
@@ -170,7 +171,7 @@ namespace SER.Utilitties.NetCore.Managers
             return JsonSerializer.Serialize(ua);
         }
 
-        public string infoRequest()
+        public string GetInfoRequest()
         {
             string refer = _contextAccessor.HttpContext.Request.Headers["Referer"];
             var infoRequest = new InfoRequest
@@ -183,8 +184,7 @@ namespace SER.Utilitties.NetCore.Managers
                 host = string.Format("{0}", _contextAccessor.HttpContext.Request.Host),
                 refferer_url = string.Format("{0}", (string.IsNullOrEmpty(refer)) ? "" : refer)
             };
-            return JsonSerializer.Serialize<InfoRequest>(infoRequest,
-                new JsonSerializerOptions { WriteIndented = true, });
+            return JsonSerializer.Serialize<InfoRequest>(infoRequest);
         }
 
         class InfoRequest
@@ -213,5 +213,13 @@ namespace SER.Utilitties.NetCore.Managers
             return _contextAccessor.HttpContext.User.Claims.Where(x =>
                 x.Type == UtilConstants.Role).Select(x => x.Value).ToList();
         }
+    }
+
+    class AuditUpdate
+    {
+
+        public string PropertyName { get; set; }
+        public string OldValue { get; set; }
+        public string NewValue { get; set; }
     }
 }

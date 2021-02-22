@@ -12,9 +12,9 @@ namespace SER.Utilitties.NetCore.Models
     public class Audit
     {
         public int id { get; set; }
-        public DateTime current_date { get; set; }
+        public DateTime date { get; set; }
 
-        public byte action { get; set; }
+        public AudiState action { get; set; }
 
         [StringLength(20)]
         public string objeto { get; set; }
