@@ -16,6 +16,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace SER.Utilitties.NetCore.Managers
 {
@@ -58,40 +59,60 @@ namespace SER.Utilitties.NetCore.Managers
                 || x.State == EntityState.Added
                 || x.State == EntityState.Deleted && x.Entity != null).ToList();
 
+            var writerOptions = new JsonWriterOptions
+            {
+                Indented = false
+            };
+            using var stream = new MemoryStream();
+            using var writer = new Utf8JsonWriter(stream, writerOptions);
+            writer.WriteStartObject();
 
             if (!string.IsNullOrEmpty(id))
             {
-                entity.json_observations.Add("ObjectId", id);
+                writer.WritePropertyName("ObjectId");
+                writer.WriteStringValue(id);
             }
+
+            if (entity.extras != null)
+            {
+                foreach (var extra in entity.extras)
+                {
+                    writer.WritePropertyName(extra.Key);
+                    writer.WriteStringValue(extra.Value);
+                }
+            }
+
             if ((new int[] { (int)AudiState.CREATE, (int)AudiState.UPDATE, (int)AudiState.DELETE }).ToList().Contains((int)entity.action))
             {
                 foreach (var add in entities.Where(p => p.State == EntityState.Added))
                 {
                     string entityName = add.Entity.GetType().Name;
-                    _logger.LogWarning($"EntityState.Added, entityName {entityName}\n");
+                    _logger.LogInformation($"EntityState.Added, entityName {entityName}\n");
                 }
 
                 foreach (var change in entities.Where(p => p.State == EntityState.Modified))
                 {
                     string entityName = change.Entity.GetType().Name;
-                    _logger.LogWarning($"EntityState.Modified, entityName {entityName}\n");
+                    _logger.LogInformation($"EntityState.Modified, entityName {entityName}\n");
                     //if (!(new string[] { "Claim" }).ToList().Contains(entity.Object))
                     //    entity.Object = entityName;
                     //entity.Action = UPDATE;
-                    valuesToChange = AuditEntityModified(change);
-                    entity.json_observations.Add("Values", valuesToChange);
+                    AuditEntityModified(writer, change, out valuesToChange);
                 }
 
                 foreach (var delete in entities.Where(p => p.State == EntityState.Deleted))
                 {
                     string entityName = delete.Entity.GetType().Name;
-                    _logger.LogWarning($"EntityState.Deleted, entityName {entityName}\n");
+                    _logger.LogInformation($"EntityState.Deleted, entityName {entityName}\n");
                 }
             }
             var userId = GetCurrentUser();
             var userName = GetCurrenUserName();
+            writer.WriteEndObject();
+            writer.Flush();
+            var data = Encoding.UTF8.GetString(stream.ToArray());
 
-            Audit log = new Audit()
+            var log = new Audit()
             {
                 date = DateTime.UtcNow,
                 action = entity.action,
@@ -100,7 +121,7 @@ namespace SER.Utilitties.NetCore.Managers
                 role = string.Join(",", GetRolesUser().ToArray()),
                 json_browser = InfoBrowser(),
                 json_request = GetInfoRequest(),
-                json_observation = entity.json_observations.ToString(),
+                data = data,
                 user_id = userId
             };
 
@@ -131,8 +152,10 @@ namespace SER.Utilitties.NetCore.Managers
         }
 
 
-        public string AuditEntityModified(EntityEntry objectStateEntry)
+        public void AuditEntityModified(Utf8JsonWriter writer, EntityEntry objectStateEntry, out string valueString)
         {
+            writer.WritePropertyName("Values");
+            writer.WriteStartArray();
             var values = new List<AuditUpdate>();
             foreach (var prop in objectStateEntry.OriginalValues.Properties)
             {
@@ -151,9 +174,21 @@ namespace SER.Utilitties.NetCore.Managers
                         OldValue = originalValue,
                         NewValue = currentValue,
                     });
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("PropertyName");
+                    writer.WriteStringValue(prop.Name);
+
+                    writer.WritePropertyName("OldValue");
+                    writer.WriteStringValue(originalValue);
+
+                    writer.WritePropertyName("NewValue");
+                    writer.WriteStringValue(currentValue);
+                    writer.WriteEndObject();
                 }
             }
-            return JsonSerializer.Serialize(values);
+            writer.WriteEndArray();
+
+            valueString = JsonSerializer.Serialize(values);
         }
 
 
@@ -212,6 +247,15 @@ namespace SER.Utilitties.NetCore.Managers
         {
             return _contextAccessor.HttpContext.User.Claims.Where(x =>
                 x.Type == UtilConstants.Role).Select(x => x.Value).ToList();
+        }
+
+        public static JsonElement ToJsonDocument(string response)
+        {
+            var documentOptions = new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip
+            };
+            return JsonDocument.Parse(response, documentOptions).RootElement;
         }
     }
 
