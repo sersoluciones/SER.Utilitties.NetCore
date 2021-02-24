@@ -13,11 +13,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using SER.Utilitties.NetCore.Models;
-using SER.Utilitties.NetCore.Managers;
 using SER.Utilitties.NetCore.Utilities;
 using Newtonsoft.Json;
 using SER.AmazonS3;
 using SER.AmazonS3.Models;
+using SER.Models.SERAudit;
+using SER.Models;
+using Microsoft.Extensions.Options;
+using SER.Utilitties.NetCore.Configuration;
 
 namespace SER.Utilitties.NetCore.Services
 {
@@ -29,8 +32,9 @@ namespace SER.Utilitties.NetCore.Services
         private readonly ILogger _logger;
         private readonly IHttpContextAccessor contextAccessor;
         private readonly AuditManager _cRepositoryLog;
-        private IConfiguration _config;
-        private IMemoryCache _cache;
+        private readonly IOptionsMonitor<SERRestOptions> _optionsDelegate;
+        private readonly IConfiguration _config;
+        private readonly IMemoryCache _cache;
         public string model;
 
         public GenericModelFactory(
@@ -44,6 +48,7 @@ namespace SER.Utilitties.NetCore.Services
             model = typeof(T).Name;
             _cRepositoryLog = httpContextAccessor.HttpContext.RequestServices.GetService<AuditManager>();
             _cache = httpContextAccessor.HttpContext.RequestServices.GetService<IMemoryCache>();
+            _optionsDelegate = httpContextAccessor.HttpContext.RequestServices.GetService<IOptionsMonitor<SERRestOptions>>();
             _logger = httpContextAccessor.HttpContext.RequestServices.GetService<ILogger<GenericModelFactory<T, TContext>>>();
         }
 
@@ -98,12 +103,14 @@ namespace SER.Utilitties.NetCore.Services
 
                 var cacheKeySize = string.Format("_{0}_size", model);
                 _cache.Remove(cacheKeySize);
-
-                await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                if (_optionsDelegate.CurrentValue.EnableAudit)
                 {
-                    action = AudiState.CREATE,
-                    objeto = this.model
-                }, id: GetKey(entity), commit: true);
+                    await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                    {
+                        action = AudiState.CREATE,
+                        objeto = this.model
+                    }, id: GetKey(entity), commit: true);
+                }
 
             }
             catch (DbUpdateException error)
@@ -128,12 +135,14 @@ namespace SER.Utilitties.NetCore.Services
                 return null;
             }
             //GetModel.Update(entity);
-
-            await _cRepositoryLog.AddLog(_context, new AuditBinding()
+            if (_optionsDelegate.CurrentValue.EnableAudit)
             {
-                action = AudiState.UPDATE,
-                objeto = this.model
-            }, id: GetKey(entity));
+                await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                {
+                    action = AudiState.UPDATE,
+                    objeto = this.model
+                }, id: GetKey(entity));
+            }
 
             _context.Entry(entity).State = EntityState.Modified;
             try
@@ -195,12 +204,14 @@ namespace SER.Utilitties.NetCore.Services
                         _logger.LogError(e.ToString());
                     }
                 }
-
-                await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                if (_optionsDelegate.CurrentValue.EnableAudit)
                 {
-                    action = AudiState.UPDATE,
-                    objeto = this.model
-                }, id: GetKey(entity));
+                    await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                    {
+                        action = AudiState.UPDATE,
+                        objeto = this.model
+                    }, id: GetKey(entity));
+                }
 
                 _context.Entry(obj).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
@@ -224,12 +235,14 @@ namespace SER.Utilitties.NetCore.Services
 
                 var cacheKeySize = string.Format("_{0}_size", model);
                 _cache.Remove(cacheKeySize);
-
-                await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                if (_optionsDelegate.CurrentValue.EnableAudit)
                 {
-                    action = AudiState.DELETE,
-                    objeto = this.model
-                }, id: GetKey(entity), commit: true);
+                    await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                    {
+                        action = AudiState.DELETE,
+                        objeto = this.model
+                    }, id: GetKey(entity), commit: true);
+                }
 
             }
             catch (DbUpdateConcurrencyException error)

@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 using SER.Utilitties.NetCore.Services;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SER.Utilitties.NetCore.SerRest;
-using SER.Utilitties.NetCore.Managers;
 using SER.Utilitties.NetCore.Utilities;
 using SER.AmazonS3;
+using SER.Models.SERAudit;
 
 namespace SER.Utilitties.NetCore.Configuration
 {

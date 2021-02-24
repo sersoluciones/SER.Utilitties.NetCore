@@ -2,6 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SER.Models;
+using SER.Models.Patch;
+using SER.Models.SERAudit;
+using SER.Utilitties.NetCore.Configuration;
 using SER.Utilitties.NetCore.Models;
 using SER.Utilitties.NetCore.Utilities;
 using System;
@@ -27,17 +32,23 @@ namespace SER.Utilitties.NetCore.Services
         private readonly ILogger _logger;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IConfiguration _config;
+        private readonly AuditManager _cRepositoryLog;
+        private readonly IOptionsMonitor<SERRestOptions> _optionsDelegate;
         private string Namespace;
 
         public PatchManager(TContext db,
             ILogger<PatchManager<TContext, TUser, TRole>> logger,
             IConfiguration config,
+            AuditManager cRepositoryLog,
+            IOptionsMonitor<SERRestOptions> optionsDelegate,
             IHttpContextAccessor contextAccessor)
         {
             _context = db;
             _config = config;
             _logger = logger;
+            _cRepositoryLog = cRepositoryLog;
             _httpContextAccessor = contextAccessor;
+            _optionsDelegate = optionsDelegate;
             Namespace = _config["Validation:namespace"];
         }
 
@@ -88,7 +99,7 @@ namespace SER.Utilitties.NetCore.Services
         {
             var modelo = isList ? model.Path.Split("/")[^3] : model.Path.Split("/")[^2];
             var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == typeof(TContext).Assembly.GetName().Name);
-            asm = Assembly.Load(Namespace);
+            // asm = Assembly.Load(Namespace);
             Type type;
             if (modelo == "User") type = typeof(TUser);
             else if (modelo == "Role") type = typeof(TRole);
@@ -205,7 +216,7 @@ namespace SER.Utilitties.NetCore.Services
         {
             var field = model.Path.Split("/").Last();
             var obj = _context.Set<T>().Find(id);
-            if (obj != null && model.Op == Options.replace)
+            if (obj != null && model.Op == SER.Models.Options.replace)
             {
                 JsonElement ele = (JsonElement)model.Value;
 
@@ -229,6 +240,23 @@ namespace SER.Utilitties.NetCore.Services
                         DeleteRelationsM2M(typeof(T), type, id);
 
                     obj.GetType().GetProperty(propertyInfo.Name)?.SetValue(obj, value, null);
+
+                    if (_optionsDelegate.CurrentValue.EnableAudit)
+                    {
+                        var modified = await _cRepositoryLog.AddLog(_context, new AuditBinding()
+                        {
+                            action = AudiState.UPDATE,
+                            objeto = typeof(T).Name,
+                        }, id: id.ToString());
+                        var propInfo = typeof(T).GetProperties().FirstOrDefault(x => x.Name.ToSnakeCase() == "last_movement");
+                        if (propInfo != null)
+                            obj.GetType().GetProperty(propInfo.Name)?.SetValue(obj, modified, null);
+
+                        obj.GetType().GetProperty("update_date")?.SetValue(obj, DateTime.UtcNow, null);
+                        obj.GetType().GetProperty("UpdateDate")?.SetValue(obj, DateTime.UtcNow, null);
+                        obj.GetType().GetProperty("updated_by_id")?.SetValue(obj, GetCurrentUser(), null);
+                    }
+
                     await _context.SaveChangesAsync();
                 }
                 catch (Exception e)
@@ -311,6 +339,16 @@ namespace SER.Utilitties.NetCore.Services
         {
             return _httpContextAccessor.HttpContext.User.Claims.Where(x =>
                 x.Type == UtilConstants.Role).Select(x => x.Value).ToList();
+        }
+
+        public string GetCurrentUser()
+        {
+            return _httpContextAccessor.HttpContext.User.Claims.FirstOrDefault(x => x.Type == UtilConstants.Subject)?.Value;
+        }
+
+        public string GetCurrenUserName()
+        {
+            return _httpContextAccessor.HttpContext.User.Claims.FirstOrDefault(x => x.Type == UtilConstants.Name)?.Value;
         }
         #endregion
     }

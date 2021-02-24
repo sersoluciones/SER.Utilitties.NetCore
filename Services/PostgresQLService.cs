@@ -15,6 +15,8 @@ using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations.Schema;
 using SER.Utilitties.NetCore.Utilities;
+using Microsoft.Extensions.Options;
+using SER.Utilitties.NetCore.Configuration;
 
 namespace SER.Utilitties.NetCore.Services
 {
@@ -31,17 +33,20 @@ namespace SER.Utilitties.NetCore.Services
                         && level == LogLevel.Information)
                 .AddConsole();
         });
+        private readonly IOptionsMonitor<SERRestOptions> _optionsDelegate;
 
         public PostgresQLService(
             ILogger<PostgresQLService> logger,
             IHttpContextAccessor httpContextAccessor,
             IMemoryCache memoryCache,
+            IOptionsMonitor<SERRestOptions> optionsDelegate,
             IConfiguration config)
         {
             _logger = logger;
             _config = config;
             _contextAccessor = httpContextAccessor;
             _cache = memoryCache;
+            _optionsDelegate = optionsDelegate;
         }
 
         private string Filter<E>(out Dictionary<string, object> Params, string prefix) where E : class
@@ -356,7 +361,7 @@ namespace SER.Utilitties.NetCore.Services
 
         public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null)
         {
-            string SqlConnectionStr = _config.GetConnectionString("PsqlConnection");
+            string SqlConnectionStr = _optionsDelegate.CurrentValue.ConnectionString;
             string Query = @"select count(*) from ( " + query + " ) as p";
             Stopwatch sw = new Stopwatch();
 
@@ -394,7 +399,7 @@ namespace SER.Utilitties.NetCore.Services
          string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true, string take = null, string page = null,
          string queryCount = null, string connection = null)
         {
-            string SqlConnectionStr = _config.GetConnectionString(connection ?? "PsqlConnection");
+            string SqlConnectionStr = _config.GetConnectionString(connection ?? _optionsDelegate.CurrentValue.ConnectionString);
 
             StringBuilder sb = new StringBuilder();
             string Query = query;
@@ -598,7 +603,7 @@ namespace SER.Utilitties.NetCore.Services
            bool serialize = false, string connection = null, string prefix = null, string whereArgs = null)
             where E : class
         {
-            string SqlConnectionStr = _config.GetConnectionString(connection ?? "PsqlConnection");
+            string SqlConnectionStr = _config.GetConnectionString(connection ?? _optionsDelegate.CurrentValue.ConnectionString);
             StringBuilder sb = new StringBuilder();
             string Query = query;
             PagedResultBase pageResult = null;

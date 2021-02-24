@@ -1,4 +1,5 @@
-﻿using SER.Utilitties.NetCore.Models;
+﻿using SER.Models;
+using SER.Utilitties.NetCore.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
