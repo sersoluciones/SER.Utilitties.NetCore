@@ -399,7 +399,7 @@ namespace SER.Utilitties.NetCore.Services
          string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true, string take = null, string page = null,
          string queryCount = null, string connection = null)
         {
-            string SqlConnectionStr = _config.GetConnectionString(connection ?? _optionsDelegate.CurrentValue.ConnectionString);
+            string SqlConnectionStr = connection ?? _optionsDelegate.CurrentValue.ConnectionString;
 
             StringBuilder sb = new StringBuilder();
             string Query = query;
@@ -603,7 +603,7 @@ namespace SER.Utilitties.NetCore.Services
            bool serialize = false, string connection = null, string prefix = null, string whereArgs = null)
             where E : class
         {
-            string SqlConnectionStr = _config.GetConnectionString(connection ?? _optionsDelegate.CurrentValue.ConnectionString);
+            string SqlConnectionStr = connection ?? _optionsDelegate.CurrentValue.ConnectionString;
             StringBuilder sb = new StringBuilder();
             string Query = query;
             PagedResultBase pageResult = null;
