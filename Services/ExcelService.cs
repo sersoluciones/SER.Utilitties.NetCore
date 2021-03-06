@@ -280,7 +280,7 @@ namespace SER.Utilitties.NetCore.Services
 
                                 else if (value is DateTime)
                                 {
-                                    Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                    Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
                                     Cells.Value = (DateTime)value;
                                 }
                                 else
