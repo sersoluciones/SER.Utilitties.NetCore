@@ -17,7 +17,7 @@ namespace SER.Utilitties.NetCore.MisDatos
         #region Atributes
         private string _baseUrl;
         private readonly ILogger _logger;
-        private readonly RestClient _client;
+        private RestClient _client;
         private readonly IConfiguration _config;
         private string _auth = string.Empty;
         #endregion
@@ -31,9 +31,24 @@ namespace SER.Utilitties.NetCore.MisDatos
             _logger = logger;
         }
 
+        /// <summary>
+        /// https://documenter.getpostman.com/view/3987067/SWE56Jz1?version=latest#035aa9a8-c506-4d21-b53c-644b427deb6a
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
         public async Task<ResponsePersonalData> FetchPersonAsync(PersonData model)
         {
             return await Execute<ResponsePersonalData>(MakePostRequest(model, endPoint: "consultarNombres"));
+        }
+
+        /// <summary>
+        /// https://documenter.getpostman.com/view/3987067/TVzUEwnN#b924e28c-353e-432e-8b01-be7b48242753
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public async Task<ResponseChildData> FetchChildAsync(PersonData model)
+        {
+            return await Execute<ResponseChildData>(MakePostRequest(model, endPoint: "registraduria/civilRegisty", baseUrl: "https://mdapi-microservices.dinamicadigital.cloud/api/" ));
         }
 
         public async Task<ResponseCompanyData> FetchCompanyAsync(string nit)
@@ -70,8 +85,12 @@ namespace SER.Utilitties.NetCore.MisDatos
             return request;
         }
 
-        private RestRequest MakePostRequest(dynamic model, string endPoint = "")
+        private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "")
         {
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                _client = new RestClient(baseUrl);
+            }
             var request = new RestRequest(endPoint, Method.POST);
             request.AddHeader("Authorization", _auth);
             var jsonString = JsonSerializer.Serialize(model);
