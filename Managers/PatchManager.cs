@@ -218,15 +218,19 @@ namespace SER.Utilitties.NetCore.Services
             var obj = _context.Set<T>().Find(id);
             if (obj != null && model.Op == SER.Models.Options.replace)
             {
-                JsonElement ele = (JsonElement)model.Value;
-
                 var propertyInfo = typeof(T).GetProperties().SingleOrDefault(x => x.Name == field);
                 // Console.WriteLine($"-----------------type {typeof(T)} Value {ele} propertyInfo.Name {propertyInfo.Name} property type {propertyInfo.PropertyType}-----------------------");
 
-                dynamic value = typeof(JsonExtensions)
-                   .GetMethod("ElementToObject")
-                   .MakeGenericMethod(propertyInfo.PropertyType)
-                   .Invoke(null, new object[] { ele });
+                dynamic value = model.Value;
+                if (model.Value != null)
+                {
+                    JsonElement ele = (JsonElement)model.Value;
+
+                    value = typeof(JsonExtensions)
+                                      .GetMethod("ElementToObject")
+                                      .MakeGenericMethod(propertyInfo.PropertyType)
+                                      .Invoke(null, new object[] { ele });
+                }
 
                 try
                 {
