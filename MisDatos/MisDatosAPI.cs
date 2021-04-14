@@ -117,7 +117,7 @@ namespace SER.Utilitties.NetCore.MisDatos
             }
             catch (Exception e)
             {
-                _logger.LogError(e.ToString());
+                _logger.LogError(string.Format("MIS DATOS API {0}\n{1}", response.Content, e.ToString()));
                 throw;
             }
         }
