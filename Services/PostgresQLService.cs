@@ -17,6 +17,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using SER.Utilitties.NetCore.Utilities;
 using Microsoft.Extensions.Options;
 using SER.Utilitties.NetCore.Configuration;
+using System.Collections;
 
 namespace SER.Utilitties.NetCore.Services
 {
@@ -68,7 +69,12 @@ namespace SER.Utilitties.NetCore.Services
                 {
                     if (!propertyInfo.GetCustomAttributes(true).Any(x => x.GetType() == typeof(JsonIgnoreAttribute))
                         && !propertyInfo.GetCustomAttributes(true).Any(x => x.GetType() == typeof(NotMappedAttribute))
-                        && !propertyInfo.PropertyType.Name.Contains("List"))
+                         && !propertyInfo.GetCustomAttributes(true).Where(x => x.GetType() == typeof(ColumnAttribute)).Any(attr => ((ColumnAttribute)attr).TypeName == "geography"
+                        || ((ColumnAttribute)attr).TypeName == "jsonb")
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IList<>))
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
+                        && !(typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType)))
                         properties.Add(propertyInfo.Name, propertyInfo.PropertyType);
                 }
 

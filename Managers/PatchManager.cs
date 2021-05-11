@@ -10,6 +10,7 @@ using SER.Utilitties.NetCore.Configuration;
 using SER.Utilitties.NetCore.Models;
 using SER.Utilitties.NetCore.Utilities;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
@@ -235,7 +236,7 @@ namespace SER.Utilitties.NetCore.Services
                 try
                 {
                     Type type = null;
-                    var isList = propertyInfo.PropertyType.Name.Contains("List");
+                    var isList = !propertyInfo.PropertyType.IsArray && typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType); // propertyInfo.PropertyType.Name.Contains("List");
                     if (isList)
                         type = propertyInfo.PropertyType.GetGenericArguments().Count() > 0 ?
                             propertyInfo.PropertyType.GetGenericArguments()[0] : propertyInfo.PropertyType;

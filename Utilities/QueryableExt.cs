@@ -14,6 +14,7 @@ using System.Dynamic;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using SER.Utilitties.NetCore.Models;
+using System.Collections;
 
 namespace SER.Utilitties.NetCore.Utilities
 {
@@ -104,7 +105,12 @@ namespace SER.Utilitties.NetCore.Utilities
                     //Console.WriteLine($"_________________TRACEEEEEEEEEEEEEEEEE____________: key: {propertyInfo.Name} value: {propertyInfo.PropertyType.Name}");
                     if (!propertyInfo.GetCustomAttributes(true).Any(x => x.GetType() == typeof(JsonIgnoreAttribute))
                          && !propertyInfo.GetCustomAttributes(true).Any(x => x.GetType() == typeof(NotMappedAttribute))
-                         && !propertyInfo.PropertyType.Name.Contains("List"))
+                         && !propertyInfo.GetCustomAttributes(true).Where(x => x.GetType() == typeof(ColumnAttribute)).Any(attr => ((ColumnAttribute)attr).TypeName == "geography"
+                        || ((ColumnAttribute)attr).TypeName == "jsonb")
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IList<>))
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                        && !(propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
+                        && !(typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType)))
                         properties.Add(propertyInfo.Name, propertyInfo.PropertyType);
                 }
 
