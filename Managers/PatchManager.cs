@@ -220,7 +220,8 @@ namespace SER.Utilitties.NetCore.Services
             if (obj != null && model.Op == SER.Models.Options.replace)
             {
                 var propertyInfo = typeof(T).GetProperties().SingleOrDefault(x => x.Name == field);
-                // Console.WriteLine($"-----------------type {typeof(T)} Value {ele} propertyInfo.Name {propertyInfo.Name} property type {propertyInfo.PropertyType}-----------------------");
+                if (propertyInfo == null) return obj;
+                //Console.WriteLine($"-----------------type {typeof(T)} Value {model.Value} field {field} propertyInfo.Name {propertyInfo?.Name} property type {propertyInfo?.PropertyType}-----------------------");
 
                 dynamic value = model.Value;
                 if (model.Value != null)

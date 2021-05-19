@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net5.0</TargetFramework>
 		<Company>SER Soluciones</Company>
-		<Version>0.15.3</Version>
+		<Version>0.15.4</Version>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>
 			Utilities for Net 5 to make easier start any project
