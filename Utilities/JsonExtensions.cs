@@ -12,6 +12,15 @@ namespace SER.Utilitties.NetCore.Utilities
 {
     public static class JsonExtensions
     {
+        public static JsonElement ToJsonDocument(string response)
+        {
+            var documentOptions = new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip
+            };
+            return JsonDocument.Parse(response, documentOptions).RootElement;
+        }
+
         public static T ElementToObject<T>(JsonElement element)
         {
             var bufferWriter = new ArrayBufferWriter<byte>();

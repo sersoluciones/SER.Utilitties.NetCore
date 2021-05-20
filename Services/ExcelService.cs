@@ -1,20 +1,133 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Npgsql;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using OfficeOpenXml.Table;
+using SER.Utilitties.NetCore.Configuration;
 using SER.Utilitties.NetCore.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Services
 {
     public class ExcelService
     {
+        private readonly ILogger _logger;
+        private IConfiguration _config;
+        private readonly IHttpContextAccessor _contextAccessor;
+        private readonly IOptionsMonitor<SERRestOptions> _optionsDelegate;
+
+        public ExcelService(
+            ILogger<ExcelService> logger,
+            IHttpContextAccessor httpContextAccessor,
+            IOptionsMonitor<SERRestOptions> optionsDelegate,
+            IConfiguration config)
+        {
+            _logger = logger;
+            _config = config;
+            _contextAccessor = httpContextAccessor;
+            _optionsDelegate = optionsDelegate;
+        }
+
+        private string Pagination(string query, out PagedResultBase result,
+        Dictionary<string, object> Params)
+        {
+            result = new PagedResultBase();
+            StringBuilder st = new StringBuilder();
+            var ParamsPagination = new Dictionary<string, object>();
+            int count = Params == null ? 0 : Params.Count;
+            // Pagination
+            if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("page")).Value.ToString(), out int pageNumber))
+            {
+                var pageSizeRequest = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("take")).Value;
+
+                int pageSize = string.IsNullOrEmpty(pageSizeRequest) ? 20 : int.Parse(pageSizeRequest);
+                pageNumber = pageNumber == 0 ? 1 : pageNumber;
+
+                for (int i = 0; i < 2; i++)
+                {
+                    var param = $"@P_{count + i}_";
+                    if (i == 0)
+                    {
+                        st.Append("LIMIT ");
+                        st.Append(param);
+                        ParamsPagination.Add(param, pageSize);
+                    }
+                    else
+                    {
+                        st.Append(" OFFSET ");
+                        st.Append(param);
+                        var value = (pageNumber * pageSize) - pageSize;
+                        ParamsPagination.Add(param, value);
+                    }
+                }
+
+                result.current_page = pageNumber;
+                result.page_size = pageSize;
+                result.row_count = GetCountDBAsync(query, Params).Result;
+
+                var pageCount = (double)result.row_count / pageSize;
+                result.page_count = (int)Math.Ceiling(pageCount);
+
+                foreach (var param in ParamsPagination)
+                    Params.Add(param.Key, param.Value);
+
+                return st.ToString();
+            }
+            return string.Empty;
+        }
+
+        private static string ParamsToString(NpgsqlParameter[] dictionary)
+        {
+            return "{" + string.Join(",", dictionary.Select(kv => kv.ParameterName + "=" + kv.Value).ToArray()) + "}";
+        }
+
+        public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null)
+        {
+            string SqlConnectionStr = _optionsDelegate.CurrentValue.ConnectionString;
+            string Query = @"select count(*) from ( " + query + " ) as p";
+            Stopwatch sw = new Stopwatch();
+
+            using (NpgsqlConnection _conn = new NpgsqlConnection(SqlConnectionStr))
+            {
+                try
+                {
+                    _conn.Open();
+                    sw.Start();
+                    using var cmd = _conn.CreateCommand();
+                    cmd.CommandText = Query;
+                    cmd.CommandTimeout = 120;
+                    cmd.Parameters.AddRange(cmd.SetSqlParamsPsqlSQL(Params, _logger));
+                    _logger.LogInformation($"Executed DbCommand [Parameters=[{ParamsToString(cmd.Parameters.ToArray())}], " +
+                        $"CommandType={cmd.CommandType}, CommandTimeout='{cmd.CommandTimeout}']\n" +
+                        $"      Query\n      {cmd.CommandText}");
+                    return int.Parse((await cmd.ExecuteScalarAsync()).ToString());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical("Error {0} {1} {2}\n{3}", ex.Message, ex.StackTrace, ex.Data, ex.InnerException);
+                }
+                finally
+                {
+                    //_conn.Close();
+                    sw.Stop();
+                    //_logger.LogDebug($"Closing connection to database {_context.GetType().name}");
+                    _logger.LogDebug($"Executed DbCommand Time total: {sw.Elapsed} ({sw.Elapsed.Milliseconds}ms)");
+                }
+            }
+            return 0;
+        }
+
         public async Task<object> GetDataFromPsqlDB(PostgresQLService postgresService, string modelName,
            string columnStr = "", string orderBy = "", string parameters = "", bool download = false)
         {
@@ -29,38 +142,36 @@ namespace SER.Utilitties.NetCore.Services
                 columnStr = "*";
             }
 
-            JArray jArray = new JArray();
+            StringBuilder sb = new();
+            PagedResultBase pageResult = null;
+
             string Query = $"SELECT {columnStr} FROM \"{modelName}\"";
             var Params = new Dictionary<string, object>();
 
             if (!string.IsNullOrEmpty(parameters))
             {
-                JObject jObjParams = JObject.Parse(parameters);
+                var jObjParams = JsonExtensions.ToJsonDocument(parameters);
+                var props = jObjParams.EnumerateObject();
                 int index = 0;
-                foreach (JProperty pair in jObjParams.Properties())
+                while (props.MoveNext())
                 {
+                    var pair = props.Current;
                     string propertyName = pair.Name;
+                    var propType = pair.Value.GetType();
 
-                    switch (pair.Value.Type)
-                    {
-                        case JTokenType.String:
-                            Params.Add(string.Format("@{0}", propertyName), (string)pair.Value);
-                            break;
-                        case JTokenType.Integer:
-                            Params.Add(string.Format("@{0}", propertyName), (int)pair.Value);
-                            break;
-                        case JTokenType.Boolean:
-                            Params.Add(string.Format("@{0}", propertyName), (bool)pair.Value);
-                            break;
-                        case JTokenType.Float:
-                            Params.Add(string.Format("@{0}", propertyName), (float)pair.Value);
-                            break;
-                    }
+                    if (bool.TryParse(pair.Value.ToString(), out bool @bool))
+                        Params.Add(string.Format("@{0}", propertyName), pair.Value.GetBoolean());
+                    else if (int.TryParse(pair.Value.ToString(), out int @int))
+                        Params.Add(string.Format("@{0}", propertyName), @int);
+                    else if (double.TryParse(pair.Value.ToString(), out double @double))
+                        Params.Add(string.Format("@{0}", propertyName), @double);
+                    else
+                        Params.Add(string.Format("@{0}", propertyName), $"%{pair.Value}%");
 
                     if (index == 0)
-                        Query = string.Format(@"{0} WHERE ""{1}"" = @{1}", Query, propertyName);
+                        Query = string.Format(@"{0} WHERE ""{1}"" ilike @{1}", Query, propertyName);
                     else
-                        Query = string.Format(@"{0} AND ""{1}"" = @{1}", Query, propertyName);
+                        Query = string.Format(@"{0} AND ""{1}"" ilike @{1}", Query, propertyName);
 
                     index++;
                 }
@@ -71,94 +182,150 @@ namespace SER.Utilitties.NetCore.Services
                 Query = string.Format("{0} ORDER BY \"{1}\"", Query, orderBy);
             }
 
-            var result = await postgresService.GetDataFromDBAsync(Query, Params: string.IsNullOrEmpty(parameters) ? null : Params);
-
-            if (!string.IsNullOrEmpty(result))
+            // Pagination
+            if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("page")))
             {
-                jArray = JArray.Parse(result);
+                if (Params == null) Params = new Dictionary<string, object>();
+                var paginate = Pagination(Query, out pageResult, Params);
+
+                if (!string.IsNullOrEmpty(paginate))
+                    Query = string.Format("{0}\n{1}", Query, paginate);
+
+                if (pageResult != null)
+                {
+                    sb.Append(JsonSerializer.Serialize(pageResult));
+                    sb.Replace("}", ",", sb.Length - 2, 2);
+                    sb.Append("\n\"results\": ");
+                }
             }
+
+            var result = await postgresService.GetDataFromDBAsync(Query, Params: Params.Count == 0 ? null : Params);
 
             if (download)
             {
-                return GenerateExcel(jArray, modelName);
+                return GenerateExcel(result, modelName);
             }
 
-            return jArray;
+            if (!string.IsNullOrEmpty(result))
+            {
+                if (pageResult != null)
+                {
+                    sb.Append(result);
+                    sb.Append("}");
+                    return sb.ToString();
+                }
+                return result;
+            }
+
+            return string.Empty;
         }
 
-        public byte[] GenerateExcel(JArray jArray, String modelName)
+        public byte[] GenerateExcel(string results, string modelName, string[] except = null)
         {
-            if (jArray.Count == 0) return null;
             byte[] bytes;
             MemoryStream stream = new MemoryStream();
+            var _xlsxHelpers = new XlsxHelpers();
+
             using (ExcelPackage package = new ExcelPackage(stream))
             {
-                int column = 1;
                 ExcelWorksheet worksheet = package.Workbook.Worksheets.Add(modelName);
-                //First add the headers
+
                 int row = 1;
-                foreach (JObject parsedObject in jArray.Children<JObject>())
+                int column = 1;
+
+                var jsonElement = JsonExtensions.ToJsonDocument(results);
+                var array = jsonElement.EnumerateArray();
+
+                // Headers
+                if (array.Any())
                 {
-                    column = 1;
-                    foreach (JProperty pair in parsedObject.Properties())
+                    string[] keys = array.First().EnumerateObject().Select(p => p.Name).ToArray();
+
+                    if (except != null && except.Length > 0)
+                        keys = array.First().EnumerateObject().Where(x => !except.Contains(x.Name)).Select(p => p.Name).ToArray();
+
+                    foreach (var key in keys)
                     {
-                        string propertyName = pair.Name;
-                        worksheet.Cells[row, column].Value = propertyName.ToUpper();
+                        using (ExcelRange Cells = worksheet.Cells[row, column])
+                        {
+                            Cells.Value = key.ToUpper();
+                            // _xlsxHelpers.MakeTitle(Cells);
+                        }
+
                         column++;
                     }
                 }
-                row++;
 
                 var numberformat = "#,##0";
-                //var dataCellStyleName = "TableNumber";
-                //var numStyle = package.Workbook.Styles.CreateNamedStyle(dataCellStyleName);
-                //numStyle.Style.Numberformat.Format = numberformat;
+                row++;
 
-                foreach (JObject parsedObject in jArray.Children<JObject>())
+                while (array.MoveNext())
                 {
-                    column = 1;
-                    foreach (JProperty pair in parsedObject.Properties())
-                    {
-                        string propertyName = pair.Name;
-                        //_logger.LogInformation($"Name: {propertyName}, Type: {parsedObject[propertyName].Type}, Value: {pair.Value}");
+                    var objectElement = array.Current;
 
-                        if (pair.Value.Type == JTokenType.None || pair.Value.Type == JTokenType.Null)
+                    var props = objectElement.EnumerateObject();
+                    column = 1;
+                    while (props.MoveNext())
+                    {
+                        var pair = props.Current;
+                        string propertyName = pair.Name;
+                        if (except != null && except.Contains(propertyName)) continue;
+
+                        var propType = pair.Value.GetType();
+
+                        using (ExcelRange Cells = worksheet.Cells[row, column])
                         {
-                            worksheet.Cells[row, column].Value = string.Empty;
+
+                            if (propType == null)
+                            {
+                                Cells.Value = string.Empty;
+                            }
+                            else if (propType == typeof(string))
+                            {
+                                Cells.Value = pair.Value.ToString();
+                            }
+                            else if (propType == typeof(int))
+                            {
+                                numberformat = "#";
+                                Cells.Style.Numberformat.Format = numberformat;
+                                Cells.Value = pair.Value.GetInt32();
+                            }
+                            else if (propType == typeof(bool))
+                            {
+                                Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+
+                                if (pair.Value.GetBoolean())
+                                {
+                                    Cells.Value = "active";
+                                    Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(135, 236, 109));
+                                    Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(33, 119, 27));
+                                    _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(87, 175, 81));
+                                }
+                                else
+                                {
+                                    Cells.Value = "inactive";
+                                    Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 165, 165));
+                                    Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(169, 34, 34));
+                                    _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(253, 78, 78));
+                                }
+                            }
+                            else if (propType == typeof(decimal) || propType == typeof(float) || propType == typeof(double))
+                            {
+                                numberformat = "#,###0";
+                                Cells.Style.Numberformat.Format = numberformat;
+                                Cells.Value = pair.Value;
+                            }
+                            else if (propType == typeof(DateTime))
+                            {
+                                Cells.Style.Numberformat.Format = "yyyy-mm-dd HH:MM:ss";
+                                Cells.Value = pair.Value.GetDateTime();
+                            }
+                            else
+                            {
+                                Cells.Value = pair.Value;
+                            }
                         }
-                        else if (pair.Value.Type == JTokenType.String)
-                        {
-                            worksheet.Cells[row, column].Value = (string)pair.Value;
-                        }
-                        else if (pair.Value.Type == JTokenType.Integer)
-                        {
-                            numberformat = "#";
-                            worksheet.Cells[row, column].Style.Numberformat.Format = numberformat;
-                            worksheet.Cells[row, column].Value = (int)pair.Value;
-                        }
-                        else if (pair.Value.Type == JTokenType.Boolean)
-                        {
-                            worksheet.Cells[row, column].Value = (bool)pair.Value;
-                        }
-                        else if (pair.Value.Type == JTokenType.Float)
-                        {
-                            numberformat = "#,###0";
-                            worksheet.Cells[row, column].Style.Numberformat.Format = numberformat;
-                            worksheet.Cells[row, column].Value = (float)pair.Value;
-                        }
-                        else if (pair.Value.Type == JTokenType.Date)
-                        {
-                            worksheet.Cells[row, column].Style.Numberformat.Format = "yyyy-mm-dd HH:MM:ss";
-                            worksheet.Cells[row, column].Value = (DateTime)pair.Value;
-                        }
-                        else if (pair.Value.Type == JTokenType.Array)
-                        {
-                            worksheet.Cells[row, column].Value = ((JArray)pair.Value).ToString(Newtonsoft.Json.Formatting.None);
-                        }
-                        else
-                        {
-                            worksheet.Cells[row, column].Value = pair.Value;
-                        }
+
                         column++;
                     }
                     row++;
