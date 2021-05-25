@@ -220,139 +220,167 @@ namespace SER.Utilitties.NetCore.Services
             return string.Empty;
         }
 
-        public byte[] GenerateExcel(string results, string modelName, string[] except = null)
+        public static dynamic GenerateExcel(string results, string modelName, Dictionary<string, string> dict = null, bool returnBytes = false)
         {
-            byte[] bytes;
-            MemoryStream stream = new MemoryStream();
+            byte[] bytes = Array.Empty<byte>();
+            MemoryStream stream = new();
             var _xlsxHelpers = new XlsxHelpers();
 
-            using (ExcelPackage package = new ExcelPackage(stream))
+            using (ExcelPackage package = new(stream))
             {
                 ExcelWorksheet worksheet = package.Workbook.Worksheets.Add(modelName);
 
                 int row = 1;
                 int column = 1;
 
-                var jsonElement = JsonExtensions.ToJsonDocument(results);
-                var array = jsonElement.EnumerateArray();
-
-                // Headers
-                if (array.Any())
+                var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(results));
+                var draw = true;
+                var numberformat = "#,##0";
+                while (reader.Read())
                 {
-                    string[] keys = array.First().EnumerateObject().Select(p => p.Name).ToArray();
+                    using ExcelRange Cells = worksheet.Cells[row + 1, column - 1 == 0 ? 1 : column - 1];
+                    switch (reader.TokenType)
+                    {
+                        case JsonTokenType.StartObject: column = 1; break;
+                        case JsonTokenType.EndObject: row++; break;
+                        case JsonTokenType.StartArray:
+                        case JsonTokenType.EndArray: break;
+                        case JsonTokenType.PropertyName:
+                            var name = reader.GetString();
+                            if (dict.Values != null && dict.Any(x => x.Key == name))
+                            {
+                                // Headers
+                                if (row == 1)
+                                {
+                                    using ExcelRange celdas = worksheet.Cells[row, column];
+                                    celdas.Value = dict.First(x => x.Key == name).Value.ToUpper();
+                                }
+                                draw = true;
+                                column++;
+                            }
+                            else if (dict.Values == null)
+                            {
+                                // Headers
+                                if (row == 1)
+                                {
+                                    using ExcelRange celdas = worksheet.Cells[row, column];
+                                    celdas.Value = name.ToUpper();
+                                }
+                                draw = true;
+                                column++;
+                            }
+                            else
+                                draw = false;
+                            break;
+                        case JsonTokenType.String:
+                            if (!draw) break;
 
-                    if (except != null && except.Length > 0)
-                        keys = array.First().EnumerateObject().Where(x => !except.Contains(x.Name)).Select(p => p.Name).ToArray();
+                            if (reader.TryGetDateTime(out DateTime @Datetime))
+                            {
+                                if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                Cells.Value = @Datetime;
+                            }
+                            else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
+                            {
+                                //number with 2 decimal places and thousand separator and money symbol
+                                numberformat = "$#,##0.00";
+                                Cells.Style.Numberformat.Format = numberformat;
+                                Cells.Value = @Decimal;
+                            }
+                            else
+                                Cells.Value = reader.GetString();
 
-                    foreach (var key in keys)
+                            break;
+                        case JsonTokenType.Number:
+                            if (!draw) break;
+                            if (reader.TryGetInt32(out int @int))
+                            {
+                                Cells.Value = @int;
+                            }
+                            else if (reader.TryGetDouble(out double @Double))
+                            {
+                                numberformat = "#,###0.0";
+                                Cells.Style.Numberformat.Format = numberformat;
+                                Cells.Value = @Double;
+                            }
+                            else
+                            {
+                                Cells.Value = reader.GetDouble();
+                            }
+                            break;
+                        case JsonTokenType.None:
+                        case JsonTokenType.Null: break;
+                        case JsonTokenType.False: if (!draw) break; Cells.Value = "No"; break;
+                        case JsonTokenType.True: if (!draw) break; Cells.Value = "Si"; break;
+                        default: break;
+                    }
+                }
+
+                if (row == 1 && dict != null)
+                {
+                    foreach (var key in dict.Values)
                     {
                         using (ExcelRange Cells = worksheet.Cells[row, column])
                         {
                             Cells.Value = key.ToUpper();
-                            // _xlsxHelpers.MakeTitle(Cells);
                         }
 
                         column++;
                     }
                 }
 
-                var numberformat = "#,##0";
-                row++;
-
-                while (array.MoveNext())
-                {
-                    var objectElement = array.Current;
-
-                    var props = objectElement.EnumerateObject();
-                    column = 1;
-                    while (props.MoveNext())
-                    {
-                        var pair = props.Current;
-                        string propertyName = pair.Name;
-                        if (except != null && except.Contains(propertyName)) continue;
-
-                        var propType = pair.Value.GetType();
-
-                        using (ExcelRange Cells = worksheet.Cells[row, column])
-                        {
-
-                            if (propType == null)
-                            {
-                                Cells.Value = string.Empty;
-                            }
-                            else if (propType == typeof(string))
-                            {
-                                Cells.Value = pair.Value.ToString();
-                            }
-                            else if (propType == typeof(int))
-                            {
-                                numberformat = "#";
-                                Cells.Style.Numberformat.Format = numberformat;
-                                Cells.Value = pair.Value.GetInt32();
-                            }
-                            else if (propType == typeof(bool))
-                            {
-                                Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
-
-                                if (pair.Value.GetBoolean())
-                                {
-                                    Cells.Value = "active";
-                                    Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(135, 236, 109));
-                                    Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(33, 119, 27));
-                                    _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(87, 175, 81));
-                                }
-                                else
-                                {
-                                    Cells.Value = "inactive";
-                                    Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 165, 165));
-                                    Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(169, 34, 34));
-                                    _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(253, 78, 78));
-                                }
-                            }
-                            else if (propType == typeof(decimal) || propType == typeof(float) || propType == typeof(double))
-                            {
-                                numberformat = "#,###0";
-                                Cells.Style.Numberformat.Format = numberformat;
-                                Cells.Value = pair.Value;
-                            }
-                            else if (propType == typeof(DateTime))
-                            {
-                                Cells.Style.Numberformat.Format = "yyyy-mm-dd HH:MM:ss";
-                                Cells.Value = pair.Value.GetDateTime();
-                            }
-                            else
-                            {
-                                Cells.Value = pair.Value;
-                            }
-                        }
-
-                        column++;
-                    }
-                    row++;
-                }
+                // para booleanos
+                // Cells.Value = "Si";
+                // Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                // Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(135, 236, 109));
+                // Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(33, 119, 27));
+                // _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(87, 175, 81));
 
                 // Add to table / Add summary row
-                var tbl = worksheet.Tables.Add(new ExcelAddressBase(fromRow: 1, fromCol: 1, toRow: row - 1, toColumn: column - 1), "Data");
-                tbl.ShowHeader = true;
-                tbl.ShowTotal = true;
-                tbl.TableStyle = TableStyles.None;
+                //var tbl = worksheet.Tables.Add(new ExcelAddressBase(fromRow: 1, fromCol: 1, toRow: row - 1, toColumn: column - 1), "Data");
+                //tbl.ShowHeader = true;
+                //tbl.ShowTotal = true;
+                //tbl.TableStyle = TableStyles.None;
 
                 //tbl.Columns[3].DataCellStyleName = dataCellStyleName;
                 //tbl.Columns[3].TotalsRowFunction = RowFunctions.Sum;
-                //worksheet.Cells[5, 4].Style.Numberformat.Format = "#,##0";
 
                 // AutoFitColumns
-                worksheet.Cells[1, 1, row - 1, column - 1].AutoFitColumns();
-                bytes = package.GetAsByteArray();
+                //worksheet.Cells[1, 1, row - 1, column - 1].AutoFitColumns();
+                worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+
+                // Printer Settings
+                worksheet.PrinterSettings.RepeatRows = new ExcelAddress("1:2");
+                worksheet.PrinterSettings.BlackAndWhite = false;
+                worksheet.PrinterSettings.PaperSize = ePaperSize.A4;
+                worksheet.PrinterSettings.Orientation = eOrientation.Landscape;
+                worksheet.PrinterSettings.TopMargin = 0.333333M;
+                worksheet.PrinterSettings.RightMargin = 0.333333M;
+                worksheet.PrinterSettings.BottomMargin = 0.44M;
+                worksheet.PrinterSettings.LeftMargin = 0.333333M;
+                worksheet.PrinterSettings.FitToPage = true;
+                worksheet.PrinterSettings.FitToWidth = 1;
+                worksheet.PrinterSettings.FitToHeight = 0;
+                worksheet.PrinterSettings.PrintArea = worksheet.Cells[1, 1, row, 46];
+
+                if (returnBytes)
+                    bytes = package.GetAsByteArray();
+                else
+                    package.Save();
             }
-            return bytes;
+            if (returnBytes)
+                return bytes;
+            else
+                return stream;
         }
 
-        public MemoryStream GenerateXlsx<M>(List<M> items, Dictionary<string, string> keys) where M : class
+        public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> keys, bool returnBytes = false) where M : class
         {
             var _xlsxHelpers = new XlsxHelpers();
-            MemoryStream stream = new MemoryStream();
-            using (ExcelPackage package = new ExcelPackage(stream))
+            MemoryStream stream = new();
+            byte[] bytes = Array.Empty<byte>();
+            using (ExcelPackage package = new(stream))
             {
                 ExcelWorksheet Worksheet = package.Workbook.Worksheets.Add("Hoja 1");
 
@@ -383,14 +411,15 @@ namespace SER.Utilitties.NetCore.Services
                             var prop = typeof(M).GetProperties().FirstOrDefault(x => x.Name == key);
                             if (prop != null)
                             {
+                                var type = prop.GetType();
                                 var value = prop.GetValue(order);
                                 if (value is null)
                                 {
-                                    Cells.Value = "-";
+                                    Cells.Value = "";
                                 }
-                                else if (value is string)
+                                else if (type == typeof(string))
                                 {
-                                    if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
+                                    if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "";
                                     else Cells.Value = value.ToString();
 
                                     if (key == "email")
@@ -410,13 +439,13 @@ namespace SER.Utilitties.NetCore.Services
                                 }
                                 else if (value is int @int)
                                 {
-                                    numberformat = "#";
-                                    Cells.Style.Numberformat.Format = numberformat;
+                                    //numberformat = "#";
+                                    //Cells.Style.Numberformat.Format = numberformat;
                                     Cells.Value = @int;
                                 }
                                 else if (value is float single)
                                 {
-                                    numberformat = "#,###0";
+                                    numberformat = "#,###0.0";
                                     Cells.Style.Numberformat.Format = numberformat;
                                     Cells.Value = single;
                                 }
@@ -427,28 +456,27 @@ namespace SER.Utilitties.NetCore.Services
                                     Cells.Style.Numberformat.Format = numberformat;
                                     Cells.Value = decim;
                                 }
+                                else if (value is double @double)
+                                {
+                                    numberformat = "#,###0.00";
+                                    Cells.Style.Numberformat.Format = numberformat;
+                                    Cells.Value = @double;
+                                }
                                 else if (value is bool boolean)
                                 {
                                     Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
                                     Cells.Value = value.ToString();
                                     if (boolean)
-                                    {
-                                        Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(135, 236, 109));
-                                        Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(33, 119, 27));
-                                        _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(87, 175, 81));
-                                    }
+                                        Cells.Value = "Si";
                                     else
-                                    {
-                                        Cells.Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(255, 165, 165));
-                                        Cells.Style.Font.Color.SetColor(System.Drawing.Color.FromArgb(169, 34, 34));
-                                        _xlsxHelpers.BorderStyle(Cells, System.Drawing.Color.FromArgb(253, 78, 78));
-                                    }
+                                        Cells.Value = "No";
                                 }
 
-                                else if (value is DateTime)
+                                else if (value is DateTime time)
                                 {
-                                    Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
-                                    Cells.Value = (DateTime)value;
+                                    if (time == time.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
+                                    Cells.Value = time;
                                 }
                                 else
                                 {
@@ -485,10 +513,15 @@ namespace SER.Utilitties.NetCore.Services
                 Worksheet.PrinterSettings.FitToHeight = 0;
                 Worksheet.PrinterSettings.PrintArea = Worksheet.Cells[1, 1, Row, 46];
 
-                package.Save();
-
+                if (returnBytes)
+                    bytes = package.GetAsByteArray();
+                else
+                    package.Save();
             }
-            return stream;
+            if (returnBytes)
+                return bytes;
+            else
+                return stream;
         }
     }
 }

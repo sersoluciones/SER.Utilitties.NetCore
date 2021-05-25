@@ -21,6 +21,17 @@ namespace SER.Utilitties.NetCore.Utilities
             return JsonDocument.Parse(response, documentOptions).RootElement;
         }
 
+        public static JsonElement? Get(this JsonElement element, string name) =>
+            element.ValueKind != JsonValueKind.Null && element.ValueKind != JsonValueKind.Undefined
+            && element.TryGetProperty(name, out var value) ? value : (JsonElement?)null;
+
+        public static JsonElement? Get(this JsonElement element, int index)
+        {
+            if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+                return null; var value = element.EnumerateArray().ElementAtOrDefault(index);
+            return value.ValueKind != JsonValueKind.Undefined ? value : (JsonElement?)null;
+        }
+
         public static T ElementToObject<T>(JsonElement element)
         {
             var bufferWriter = new ArrayBufferWriter<byte>();
