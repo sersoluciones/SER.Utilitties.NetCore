@@ -411,15 +411,18 @@ namespace SER.Utilitties.NetCore.Services
                             var prop = typeof(M).GetProperties().FirstOrDefault(x => x.Name == key);
                             if (prop != null)
                             {
-                                var type = prop.GetType();
+                                var type = prop.PropertyType;
+                                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                                    type = type.GetGenericArguments()[0];
+
                                 var value = prop.GetValue(order);
                                 if (value is null)
                                 {
-                                    Cells.Value = "";
+                                    Cells.Value = "-";
                                 }
                                 else if (type == typeof(string))
                                 {
-                                    if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "";
+                                    if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
                                     else Cells.Value = value.ToString();
 
                                     if (key == "email")
@@ -428,7 +431,7 @@ namespace SER.Utilitties.NetCore.Services
                                         Cells.Style.Font.Color.SetColor(Color.Blue);
                                         Cells.Hyperlink = new Uri("mailto:" + value.ToString(), UriKind.Absolute);
                                     }
-                                    if (key == "image" && !string.IsNullOrEmpty(value.ToString()))
+                                    if ((key == "image" || key == "attachment_id") && !string.IsNullOrEmpty(value.ToString()))
                                     {
                                         Cells.Style.Font.UnderLine = true;
                                         Cells.Style.Font.Color.SetColor(Color.Blue);
@@ -437,43 +440,44 @@ namespace SER.Utilitties.NetCore.Services
                                     //if (key == "phone") Cells.Hyperlink = new Uri(value.ToString(), UriKind.Absolute);
 
                                 }
-                                else if (value is int @int)
+                                else if (type == typeof(int))
                                 {
                                     //numberformat = "#";
                                     //Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = @int;
+                                    Cells.Value = (int)value;
                                 }
-                                else if (value is float single)
+                                else if (type == typeof(float))
                                 {
                                     numberformat = "#,###0.0";
                                     Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = single;
+                                    Cells.Value = (float)value;
                                 }
-                                else if (value is decimal decim)
+                                else if (type == typeof(decimal))
                                 {
                                     //number with 2 decimal places and thousand separator and money symbol
                                     numberformat = "$#,##0.00";
                                     Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = decim;
+                                    Cells.Value = (decimal)value;
                                 }
-                                else if (value is double @double)
+                                else if (type == typeof(double))
                                 {
                                     numberformat = "#,###0.00";
                                     Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = @double;
+                                    Cells.Value = (double)value;
                                 }
-                                else if (value is bool boolean)
+                                else if (type == typeof(bool))
                                 {
                                     Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
                                     Cells.Value = value.ToString();
-                                    if (boolean)
+                                    if ((bool)value)
                                         Cells.Value = "Si";
                                     else
                                         Cells.Value = "No";
                                 }
 
-                                else if (value is DateTime time)
+                                else if (type == typeof(DateTime))
                                 {
+                                    var time = (DateTime)value;
                                     if (time == time.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
                                     else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
                                     Cells.Value = time;
