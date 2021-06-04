@@ -281,13 +281,13 @@ namespace SER.Utilitties.NetCore.Services
                                 else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
                                 Cells.Value = @Datetime;
                             }
-                            else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
+                            /*else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
                             {
                                 //number with 2 decimal places and thousand separator and money symbol
                                 numberformat = "$#,##0.00";
                                 Cells.Style.Numberformat.Format = numberformat;
                                 Cells.Value = @Decimal;
-                            }
+                            }*/
                             else
                                 Cells.Value = reader.GetString();
 

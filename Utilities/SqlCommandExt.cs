@@ -43,6 +43,10 @@ namespace SER.Utilitties.NetCore.Utilities
                     {
                         SqlParameters.Add(new NpgsqlParameter(pair.Key, (float)pair.Value));
                     }
+                    else if (pair.Value.GetType() == typeof(long))
+                    {
+                        SqlParameters.Add(new NpgsqlParameter(pair.Key, (long)pair.Value));
+                    }
                     else if (pair.Value.GetType() == typeof(double))
                     {
                         SqlParameters.Add(new NpgsqlParameter(pair.Key, (double)pair.Value));
