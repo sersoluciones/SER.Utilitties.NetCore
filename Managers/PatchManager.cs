@@ -12,6 +12,7 @@ using SER.Utilitties.NetCore.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.IO;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace SER.Utilitties.NetCore.Services
             Namespace = _config["Validation:namespace"];
         }
 
-        public async Task<bool?> ValidateAsync(BaseValidationModel model)
+        public async Task<bool?> ValidateAsync(BaseValidationModel model, bool validateAuthentication = true)
         {
             var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == typeof(TContext).Assembly.GetName().Name);
             asm = Assembly.Load(Namespace);
@@ -78,7 +79,7 @@ namespace SER.Utilitties.NetCore.Services
                 }
                 if (fieldLocalType != null)
                 {
-                    return (await CallMethodByReflection(type, nameof(ValidateObj), new object[] { model })) as bool?;
+                    return (await CallMethodByReflection(type, nameof(ValidateObj), new object[] { model, validateAuthentication })) as bool?;
                 }
             }
             return true;
@@ -96,6 +97,146 @@ namespace SER.Utilitties.NetCore.Services
             return new List<UpdatePermission>();
         }
 
+
+
+        public IQueryable GetQueryable(Type type) => GetType()
+               .GetMethod("GetListHelper")
+               .MakeGenericMethod(type)
+               .Invoke(this, null) as IQueryable;
+
+        public DbSet<T> GetListHelper<T>() where T : class
+        {
+            return _context.Set<T>();
+        }
+
+        #region Helpers            
+        private static Expression FilterAny(Type type, string propertyName, object value)
+        {
+            var lambdaParam = Expression.Parameter(type);
+            var property = Expression.Property(lambdaParam, propertyName);
+            var expr = Expression.Call(
+                           typeof(DbFunctions),
+                           nameof(DbFunctions.Equals),
+                           Type.EmptyTypes,
+                           Expression.Property(null, typeof(EF), nameof(EF.Functions)),
+                           property,
+                           Expression.Constant($"{value}"));
+
+            return Expression.Lambda(expr, lambdaParam);
+            //return Expression.Lambda<Func<Country, bool>>(expr, lambdaParam);
+        }
+
+        public async Task<bool> ValidateObj<T>(BaseValidationModel model, bool validateAuthentication) where T : class
+        {
+            var expToEvaluate = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"{model.Field}.ToLower() = @0", $"{model.Value.ToLower()}");
+            bool exist;
+            if (!string.IsNullOrEmpty(model.Id))
+            {
+                var expToExcept = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"id != @0", model.Id);
+                if (int.TryParse(model.Id, out int res))
+                {
+                    expToExcept = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"id != @0", res);
+                }
+                var query = _context.Set<T>().Where("@0(it) and @1(it)", expToEvaluate, expToExcept);
+                if (_optionsDelegate.CurrentValue.EnableCustomFilter && validateAuthentication)
+                    query = FilterQueryByCustomFilter(query, out bool find);
+                exist = await query.AnyAsync();
+            }
+            else
+            {
+                var query = _context.Set<T>().Where(expToEvaluate);
+                if (_optionsDelegate.CurrentValue.EnableCustomFilter && validateAuthentication)
+                    query = FilterQueryByCustomFilter(query, out bool find);
+                exist = await query.AnyAsync();
+            }
+            return exist;
+        }
+
+
+        private IQueryable<T> FilterQueryByCustomFilter<T>(IQueryable<T> query, out bool find, Type parentType = null, string columnName = "") where T : class
+        {
+            string nameField = _optionsDelegate.CurrentValue.NameCustomFilter;
+            find = false;
+            string companyId = null;
+            var types = new Dictionary<string, Type>();
+            var typeToEvaluate = typeof(T);
+            if (parentType != null) typeToEvaluate = parentType;
+
+            //Console.WriteLine($" *************** nameField {nameField} Name {_httpContextAccessor.HttpContext.User.Identity.Name} IsAuthenticated {_httpContextAccessor.HttpContext.User.Identity.IsAuthenticated}" +
+            //    $" GetCompanyIdUser() { GetCompanyIdUser()}");
+            foreach (var propertyInfo in typeToEvaluate.GetProperties())
+            {
+                if (propertyInfo.GetCustomAttributes(true).Any(x => x.GetType() == typeof(NotMappedAttribute))
+                   || propertyInfo.GetCustomAttributes(true).Where(x => x.GetType() == typeof(ColumnAttribute)).Any(attr => ((ColumnAttribute)attr).TypeName == "geography"
+                       || ((ColumnAttribute)attr).TypeName == "jsonb")
+                    || (propertyInfo.PropertyType.IsArray)
+                    || (propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IList<>))
+                    || (propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    || (propertyInfo.PropertyType.IsGenericType && propertyInfo.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>))
+                    || (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
+                   )
+                {
+                    continue;
+                }
+                var field = propertyInfo.PropertyType;
+                if (field.IsGenericType && field.GetGenericTypeDefinition() == typeof(Nullable<>))
+                {
+                    field = field.GetGenericArguments()[0];
+                }
+                var childType = field ?? propertyInfo.GetType();
+                var attrName = "";
+                foreach (ForeignKeyAttribute attr in propertyInfo.GetCustomAttributes(true).Where(x => x.GetType() == typeof(ForeignKeyAttribute)))
+                {
+                    attrName = attr.Name;
+                }
+
+                if (attrName != "" && typeToEvaluate.GetProperties().SingleOrDefault(x => x.Name == attrName).GetCustomAttributes(true).Any(x => x.GetType() == typeof(RequiredAttribute)))
+                    if (typeof(IBaseModel).IsAssignableFrom(childType)
+                        || childType == typeof(TUser) || childType == typeof(TRole))
+                    {
+                        types.Add(propertyInfo.Name, childType);
+                    }
+
+                if (propertyInfo.Name.ToSnakeCase() == nameField)
+                {
+                    find = true;
+                    if (_httpContextAccessor.HttpContext.User.Identity.IsAuthenticated && !string.IsNullOrEmpty(_httpContextAccessor.HttpContext.User.Identity.Name))
+                        companyId = GetCustomFilterValue();
+                    else
+                        companyId = _httpContextAccessor.HttpContext.Session?.GetInt32(nameField)?.ToString();
+
+                    if (typeof(TUser) == typeof(T)) query = query.Where($"{columnName}{propertyInfo.Name}  = @0 OR {columnName}{propertyInfo.Name}  == null", companyId);
+                    else query = query.Where($"{columnName}{nameField}  = @0 OR {columnName}{nameField}  == null", companyId);
+                    break;
+                }
+            }
+
+            if (!find)
+            {
+                foreach (var dict in types.OrderByDescending(x => x.Key))
+                {
+                    //_logger.LogWarning($"---------------dict: {dict.Key}");
+                    query = FilterQueryByCustomFilter(query, out bool finded, dict.Value, $"{dict.Key}.");
+                    if (finded) break;
+                }
+            }
+
+            return query;
+        }
+
+        public string GetCustomFilterValue()
+        {
+            return _httpContextAccessor.HttpContext.User.Claims.FirstOrDefault(x =>
+                x.Type == _optionsDelegate.CurrentValue.NameCustomFilter)?.Value;
+        }
+
+        /// <summary>
+        /// PATCH
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="model"></param>
+        /// <param name="isList"></param>
+        /// <returns></returns>
         public async Task<object> ReplacePatch(string id, SerPatchModel model, bool isList = false)
         {
             var modelo = isList ? model.Path.Split("/")[^3] : model.Path.Split("/")[^2];
@@ -164,53 +305,6 @@ namespace SER.Utilitties.NetCore.Services
                 }
             }
             return true;
-        }
-
-        public IQueryable GetQueryable(Type type) => GetType()
-               .GetMethod("GetListHelper")
-               .MakeGenericMethod(type)
-               .Invoke(this, null) as IQueryable;
-
-        public DbSet<T> GetListHelper<T>() where T : class
-        {
-            return _context.Set<T>();
-        }
-
-        #region Helpers            
-        private static Expression FilterAny(Type type, string propertyName, object value)
-        {
-            var lambdaParam = Expression.Parameter(type);
-            var property = Expression.Property(lambdaParam, propertyName);
-            var expr = Expression.Call(
-                           typeof(DbFunctions),
-                           nameof(DbFunctions.Equals),
-                           Type.EmptyTypes,
-                           Expression.Property(null, typeof(EF), nameof(EF.Functions)),
-                           property,
-                           Expression.Constant($"{value}"));
-
-            return Expression.Lambda(expr, lambdaParam);
-            //return Expression.Lambda<Func<Country, bool>>(expr, lambdaParam);
-        }
-
-        public async Task<bool> ValidateObj<T>(BaseValidationModel model) where T : class
-        {
-            var expToEvaluate = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"{model.Field}.ToLower() = @0", $"{model.Value.ToLower()}");
-            bool exist;
-            if (!string.IsNullOrEmpty(model.Id))
-            {
-                var expToExcept = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"id != @0", model.Id);
-                if (int.TryParse(model.Id, out int res))
-                {
-                    expToExcept = DynamicExpressionParser.ParseLambda<T, bool>(new ParsingConfig(), true, $"id != @0", res);
-                }
-                exist = _context.Set<T>().Where("@0(it) and @1(it)", expToEvaluate, expToExcept).Count() > 0;
-            }
-            else
-            {
-                exist = await _context.Set<T>().AnyAsync(expToEvaluate);
-            }
-            return exist;
         }
 
         public async Task<T> Patch<T>(dynamic id, SerPatchModel model) where T : class

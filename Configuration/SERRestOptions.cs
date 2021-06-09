@@ -16,5 +16,7 @@ namespace SER.Utilitties.NetCore.Configuration
         /// </summary>
         public Type DbContextType { get; set; }
         public string ConnectionString { get; set; }
+        public bool EnableCustomFilter { get; set; }
+        public string NameCustomFilter { get; set; }
     }
 }
