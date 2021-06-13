@@ -624,8 +624,7 @@ namespace SER.Utilitties.NetCore.Services
                 else if (currentClass.Equals("ApplicationRole"))
                     currentClass = "role";
 
-                if (string.IsNullOrEmpty(prefix)) prefix = currentClass.ToLower().First().ToString();
-                var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix);
+                var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix ?? currentClass.ToLower().First().ToString());
 
                 if (Params == null && whereArgs == null)
                 {
@@ -659,8 +658,11 @@ namespace SER.Utilitties.NetCore.Services
                     Match match = Regex.Match(OrderBy, pattern);
                     if (!match.Success)
                     {
-                        string[] paramsOrderBy = OrderBy.Split(',');
-                        OrderBy = string.Join(", ", paramsOrderBy.Select(x => $"{prefix}." + x.Trim()));
+                        if (!string.IsNullOrEmpty(prefix))
+                        {
+                            string[] paramsOrderBy = OrderBy.Split(',');
+                            OrderBy = string.Join(", ", paramsOrderBy.Select(x => $"{prefix}." + x.Trim()));
+                        }
                     }
                 }
 
