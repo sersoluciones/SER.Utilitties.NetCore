@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -27,6 +29,7 @@ namespace SER.Utilitties.NetCore.Services
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IOptionsMonitor<SERRestOptions> _optionsDelegate;
 
+
         public ExcelService(
             ILogger<ExcelService> logger,
             IHttpContextAccessor httpContextAccessor,
@@ -37,6 +40,7 @@ namespace SER.Utilitties.NetCore.Services
             _config = config;
             _contextAccessor = httpContextAccessor;
             _optionsDelegate = optionsDelegate;
+
         }
 
         private string Pagination(string query, out PagedResultBase result,
@@ -203,7 +207,7 @@ namespace SER.Utilitties.NetCore.Services
 
             if (download)
             {
-                return GenerateExcel(result, modelName);
+                return GenerateExcel<object>(result, modelName);
             }
 
             if (!string.IsNullOrEmpty(result))
@@ -221,6 +225,12 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         public static dynamic GenerateExcel(string results, string modelName, Dictionary<string, string> dict = null, bool returnBytes = false)
+        {
+            return GenerateExcel<object>(results, modelName, dict: dict, returnBytes: returnBytes);
+        }
+
+        public static dynamic GenerateExcel<T>(string results, string modelName, Dictionary<string, string> dict = null, bool returnBytes = false,
+            IStringLocalizer<T> localizer = null) where T : class
         {
             byte[] bytes = Array.Empty<byte>();
             MemoryStream stream = new();
@@ -247,7 +257,7 @@ namespace SER.Utilitties.NetCore.Services
                         case JsonTokenType.EndArray: break;
                         case JsonTokenType.PropertyName:
                             var name = reader.GetString();
-                            if (dict.Values != null && dict.Any(x => x.Key == name))
+                            if (dict != null && dict.Values != null && dict.Any(x => x.Key == name))
                             {
                                 // Headers
                                 if (row == 1)
@@ -258,13 +268,13 @@ namespace SER.Utilitties.NetCore.Services
                                 draw = true;
                                 column++;
                             }
-                            else if (dict.Values == null)
+                            else if (dict?.Values == null)
                             {
                                 // Headers
                                 if (row == 1)
                                 {
                                     using ExcelRange celdas = worksheet.Cells[row, column];
-                                    celdas.Value = name.ToUpper();
+                                    celdas.Value = localizer != null ? localizer[name] : name.ToUpper();
                                 }
                                 draw = true;
                                 column++;
