@@ -133,7 +133,7 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         public async Task<object> GetDataFromPsqlDB(PostgresQLService postgresService, string modelName,
-           string columnStr = "", string orderBy = "", string parameters = "", bool download = false)
+           string columnStr = "", string orderBy = "", string parameters = "", bool download = false, string parametersExcept = "")
         {
             if (!string.IsNullOrEmpty(columnStr))
             {
@@ -151,31 +151,64 @@ namespace SER.Utilitties.NetCore.Services
 
             string Query = $"SELECT {columnStr} FROM \"{modelName}\"";
             var Params = new Dictionary<string, object>();
+            int index = 0;
 
             if (!string.IsNullOrEmpty(parameters))
             {
                 var jObjParams = JsonExtensions.ToJsonDocument(parameters);
                 var props = jObjParams.EnumerateObject();
-                int index = 0;
                 while (props.MoveNext())
                 {
                     var pair = props.Current;
                     string propertyName = pair.Name;
                     var propType = pair.Value.GetType();
+                    var evaluate = " = ";
 
-                    if (bool.TryParse(pair.Value.ToString(), out bool @bool))
+                    if (bool.TryParse(pair.Value.ToString().Trim(), out bool @bool))
                         Params.Add(string.Format("@{0}", propertyName), pair.Value.GetBoolean());
-                    else if (int.TryParse(pair.Value.ToString(), out int @int))
+                    else if (int.TryParse(pair.Value.ToString().Trim(), out int @int))
                         Params.Add(string.Format("@{0}", propertyName), @int);
-                    else if (double.TryParse(pair.Value.ToString(), out double @double))
+                    else if (double.TryParse(pair.Value.ToString().Trim(), out double @double))
                         Params.Add(string.Format("@{0}", propertyName), @double);
                     else
-                        Params.Add(string.Format("@{0}", propertyName), $"%{pair.Value}%");
+                    {
+                        Params.Add(string.Format("@{0}", propertyName), $"%{pair.Value.ToString().ToLower().Trim()}%");
+                        evaluate = " ilike ";
+                    }
 
                     if (index == 0)
-                        Query = string.Format(@"{0} WHERE ""{1}"" ilike @{1}", Query, propertyName);
+                        Query = string.Format(@"{0} WHERE ""{2}"" {1} @{2}", Query, evaluate, propertyName);
                     else
-                        Query = string.Format(@"{0} AND ""{1}"" ilike @{1}", Query, propertyName);
+                        Query = string.Format(@"{0} AND ""{2}"" {1} @{2}", Query, evaluate, propertyName);
+
+                    index++;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(parametersExcept))
+            {
+                var jObjParams = JsonExtensions.ToJsonDocument(parametersExcept);
+                var props = jObjParams.EnumerateObject();
+                while (props.MoveNext())
+                {
+                    var pair = props.Current;
+                    string propertyName = pair.Name;
+                    var propType = pair.Value.GetType();
+                    var evaluate = " <> ";
+
+                    if (bool.TryParse(pair.Value.ToString().Trim(), out bool @bool))
+                        Params.Add(string.Format("@{0}", propertyName), pair.Value.GetBoolean());
+                    else if (int.TryParse(pair.Value.ToString().Trim(), out int @int))
+                        Params.Add(string.Format("@{0}", propertyName), @int);
+                    else if (double.TryParse(pair.Value.ToString().Trim(), out double @double))
+                        Params.Add(string.Format("@{0}", propertyName), @double);
+                    else
+                        Params.Add(string.Format("@{0}", propertyName), pair.Value.ToString().Trim());
+
+                    if (index == 0)
+                        Query = string.Format(@"{0} WHERE ""{2}"" {1} @{2}", Query, evaluate, propertyName);
+                    else
+                        Query = string.Format(@"{0} AND ""{2}"" {1} @{2}", Query, evaluate, propertyName);
 
                     index++;
                 }
