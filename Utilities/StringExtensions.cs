@@ -38,6 +38,12 @@ namespace SER.Utilitties.NetCore.Utilities
             }
         }
 
+        public static string Truncate(this string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) { return value; }
+            return value.Substring(0, Math.Min(value.Length, maxLength));
+        }
+
         public static string ToSlug(this string value)
         {
             if (value == null) { return null; }
