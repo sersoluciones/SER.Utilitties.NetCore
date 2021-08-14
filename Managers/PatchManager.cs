@@ -205,8 +205,8 @@ namespace SER.Utilitties.NetCore.Services
                     else
                         companyId = _httpContextAccessor.HttpContext.Session?.GetInt32(nameField)?.ToString();
 
-                    if (typeof(TUser) == typeof(T)) query = query.Where($"{columnName}{propertyInfo.Name}  = @0 OR {columnName}{propertyInfo.Name}  == null", companyId);
-                    else query = query.Where($"{columnName}{nameField}  = @0 OR {columnName}{nameField}  == null", companyId);
+                    if (typeof(TUser) == typeof(T)) query = query.Where($"{columnName}{propertyInfo.Name}  = @0 ", companyId);
+                    else query = query.Where($"{columnName}{nameField}  = @0 ", companyId);
                     break;
                 }
             }
