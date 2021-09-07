@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -32,12 +33,14 @@ namespace SER.Utilitties.NetCore.Services
             string token = _config.GetSection("Telegram").GetSection("Token").Value;
             string channelId = _config.GetSection("Telegram").GetSection("Channels").GetSection(channel).Value;
 
-            await Execute(MakePostRequest(new TelegramViewModel
+            var model = new TelegramViewModel
             {
                 ChatId = channelId,
                 ParseMode = mode,
                 Text = message,
-            }, token));
+            };
+            await MakePostClientRequest(model, token);
+            //Execute(MakePostRequest(model, token));
         }
 
         private RestRequest MakePostRequest(TelegramViewModel model, string token)
@@ -64,6 +67,41 @@ namespace SER.Utilitties.NetCore.Services
             var response = await _client.ExecuteAsync(request);
             try
             {
+                _logger.LogInformation($" ----------- StatusCode {response.StatusCode}");
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                    return true;
+                return false;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.ToString());
+                return false;
+            }
+        }
+
+
+        private async Task<bool> MakePostClientRequest(TelegramViewModel model, string token)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            var jsonString = JsonSerializer.Serialize(model, options);
+            _logger.LogInformation($"Request:\n{jsonString}");
+            _logger.LogInformation(BASE_URL + $"/bot{token}/sendMessage");
+
+            using var client = new HttpClient();
+
+            var response = await client.PostAsJsonAsync(BASE_URL + $"/bot{token}/sendMessage", model, options);
+            try
+            {
+                //if (response.Content != null)
+                //{
+                //    string result = response.Content.ReadAsStringAsync().Result;
+                //    _logger.LogInformation($"Response:\n{result}");
+                //}
+                _logger.LogInformation($" ------------- StatusCode {response.StatusCode}");
                 if (response.StatusCode == System.Net.HttpStatusCode.OK)
                     return true;
                 return false;
