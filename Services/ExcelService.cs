@@ -390,8 +390,9 @@ namespace SER.Utilitties.NetCore.Services
                 //tbl.Columns[3].TotalsRowFunction = RowFunctions.Sum;
 
                 // AutoFitColumns
-                //worksheet.Cells[1, 1, row - 1, column - 1].AutoFitColumns();
-                worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+                // worksheet.Cells[1, 1, row - 1, column - 1].AutoFitColumns();
+                if (row > 1)
+                    worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
 
                 // Printer Settings
                 worksheet.PrinterSettings.RepeatRows = new ExcelAddress("1:2");
@@ -537,14 +538,14 @@ namespace SER.Utilitties.NetCore.Services
 
                     Row++;
                 }
-
-                Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
+                if (Row > 1)
+                    Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.Font.Name = "Arial";
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.Font.Size = 10;
-
-                Worksheet.Row(1).Height = 44;
+                if (Row > 1)
+                    Worksheet.Row(1).Height = 44;
 
                 // Printer Settings
                 Worksheet.PrinterSettings.RepeatRows = new ExcelAddress("1:2");
