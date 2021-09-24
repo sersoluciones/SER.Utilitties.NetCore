@@ -119,7 +119,7 @@ namespace SER.Utilitties.NetCore.Services
                     }
                     else expresion.Append("(");
 
-                    var patternStr = @"\=|¬";
+                    var patternStr = @"\=|¬|<=|>=|>|<";
                     string[] value = Regex.Split(column, patternStr);
                     if (string.IsNullOrEmpty(value[1])) break;
 
@@ -159,7 +159,7 @@ namespace SER.Utilitties.NetCore.Services
 
             var select = "";
             var enable = true;
-            var patternStr = @"\=|¬";
+            var patternStr = @"\=|¬|<=|>=|>|<";
             Match matchStr = Regex.Match(column, patternStr);
 
             if (typeProperty != null && typeProperty == typeof(string))
@@ -181,7 +181,7 @@ namespace SER.Utilitties.NetCore.Services
                 }
                 else if (int.TryParse(value, out int number))
                 {
-                    select = AddParam(Params, paramName, key, initialClass, matchStr, number);
+                    select = AddParam(Params, paramName, key, initialClass, matchStr, number, matchStr.Value);
                 }
                 else if (float.TryParse(value, out float fnumber))
                 {
@@ -255,9 +255,9 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         private string AddParam(Dictionary<string, object> Params, string paramName,
-            string key, string initialClass, Match matchStr, dynamic value)
+            string key, string initialClass, Match matchStr, dynamic value, string paramValue)
         {
-            string select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
+            string select = string.Format("{0}{1} {2} {3}", initialClass, key, paramValue, paramName);
             if (matchStr.Success && matchStr.Value == "¬")
             {
                 select = string.Format("{0}{1}::text ilike {2}", initialClass, key, paramName);
