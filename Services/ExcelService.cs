@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -442,10 +443,10 @@ namespace SER.Utilitties.NetCore.Services
                     column++;
                 }
 
-                var numberformat = "#,##0";
+
                 Row++;
 
-                foreach (var order in items)
+                foreach (var item in items)
                 {
                     column = 1;
                     foreach (var key in keys.Keys)
@@ -453,83 +454,23 @@ namespace SER.Utilitties.NetCore.Services
                         using (ExcelRange Cells = Worksheet.Cells[Row, column])
                         {
                             var prop = typeof(M).GetProperties().FirstOrDefault(x => x.Name == key);
+
                             if (prop != null)
                             {
                                 var type = prop.PropertyType;
                                 if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
                                     type = type.GetGenericArguments()[0];
 
-                                var value = prop.GetValue(order);
-                                if (value is null)
-                                {
-                                    Cells.Value = "-";
-                                }
-                                else if (type == typeof(string))
-                                {
-                                    if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
-                                    else Cells.Value = value.ToString();
+                                var value = prop.GetValue(item);
+                                RenderRow(Cells, key, value, type);
+                            }
+                            else if (typeof(M) == typeof(ExpandoObject))
+                            {
+                                IDictionary<string, object> propertyValues = item as ExpandoObject;
 
-                                    if (key == "email")
-                                    {
-                                        Cells.Style.Font.UnderLine = true;
-                                        Cells.Style.Font.Color.SetColor(Color.Blue);
-                                        Cells.Hyperlink = new Uri("mailto:" + value.ToString(), UriKind.Absolute);
-                                    }
-                                    if ((key == "image" || key == "attachment_id") && !string.IsNullOrEmpty(value.ToString()))
-                                    {
-                                        Cells.Style.Font.UnderLine = true;
-                                        Cells.Style.Font.Color.SetColor(Color.Blue);
-                                        Cells.Hyperlink = new Uri(value.ToString(), UriKind.Absolute);
-                                    }
-                                    //if (key == "phone") Cells.Hyperlink = new Uri(value.ToString(), UriKind.Absolute);
+                                var property = propertyValues.FirstOrDefault(x => x.Key == key);
+                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType());
 
-                                }
-                                else if (type == typeof(int))
-                                {
-                                    //numberformat = "#";
-                                    //Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = (int)value;
-                                }
-                                else if (type == typeof(float))
-                                {
-                                    numberformat = "#,###0.0";
-                                    Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = (float)value;
-                                }
-                                else if (type == typeof(decimal))
-                                {
-                                    //number with 2 decimal places and thousand separator and money symbol
-                                    numberformat = "$#,##0.00";
-                                    Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = (decimal)value;
-                                }
-                                else if (type == typeof(double))
-                                {
-                                    numberformat = "#,###0.00";
-                                    Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = (double)value;
-                                }
-                                else if (type == typeof(bool))
-                                {
-                                    Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                                    Cells.Value = value.ToString();
-                                    if ((bool)value)
-                                        Cells.Value = "Si";
-                                    else
-                                        Cells.Value = "No";
-                                }
-
-                                else if (type == typeof(DateTime))
-                                {
-                                    var time = (DateTime)value;
-                                    if (time == time.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
-                                    Cells.Value = time;
-                                }
-                                else
-                                {
-                                    Cells.Value = value;
-                                }
                             }
                         }
 
@@ -570,6 +511,82 @@ namespace SER.Utilitties.NetCore.Services
                 return bytes;
             else
                 return stream;
+        }
+
+        private static void RenderRow(ExcelRange Cells, string key, object value, Type type)
+        {
+            var numberformat = "#,##0";
+
+            if (value is null)
+            {
+                Cells.Value = "-";
+            }
+            else if (type == typeof(string))
+            {
+                if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
+                else Cells.Value = value.ToString();
+
+                if (key == "email")
+                {
+                    Cells.Style.Font.UnderLine = true;
+                    Cells.Style.Font.Color.SetColor(Color.Blue);
+                    Cells.Hyperlink = new Uri("mailto:" + value.ToString(), UriKind.Absolute);
+                }
+                if ((key == "image" || key == "attachment_id") && !string.IsNullOrEmpty(value.ToString()))
+                {
+                    Cells.Style.Font.UnderLine = true;
+                    Cells.Style.Font.Color.SetColor(Color.Blue);
+                    Cells.Hyperlink = new Uri(value.ToString(), UriKind.Absolute);
+                }
+                //if (key == "phone") Cells.Hyperlink = new Uri(value.ToString(), UriKind.Absolute);
+
+            }
+            else if (type == typeof(int))
+            {
+                //numberformat = "#";
+                //Cells.Style.Numberformat.Format = numberformat;
+                Cells.Value = (int)value;
+            }
+            else if (type == typeof(float))
+            {
+                numberformat = "#,###0.0";
+                Cells.Style.Numberformat.Format = numberformat;
+                Cells.Value = (float)value;
+            }
+            else if (type == typeof(decimal))
+            {
+                //number with 2 decimal places and thousand separator and money symbol
+                numberformat = "$#,##0.00";
+                Cells.Style.Numberformat.Format = numberformat;
+                Cells.Value = (decimal)value;
+            }
+            else if (type == typeof(double))
+            {
+                numberformat = "#,###0.00";
+                Cells.Style.Numberformat.Format = numberformat;
+                Cells.Value = (double)value;
+            }
+            else if (type == typeof(bool))
+            {
+                Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                Cells.Value = value.ToString();
+                if ((bool)value)
+                    Cells.Value = "Si";
+                else
+                    Cells.Value = "No";
+            }
+
+            else if (type == typeof(DateTime))
+            {
+                var time = (DateTime)value;
+                if (time == time.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
+                Cells.Value = time;
+            }
+            else
+            {
+                Cells.Value = value;
+            }
         }
     }
 }
