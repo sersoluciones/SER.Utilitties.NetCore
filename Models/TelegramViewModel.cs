@@ -19,14 +19,14 @@ namespace SER.Utilitties.NetCore.Models
         public string Text { get; set; }
 
         [JsonPropertyName("reply_markup")]
-        public List<TelegramMarkup> ReplyMarkup { get; set; } 
+        public TelegramMarkup ReplyMarkup { get; set; } 
        
     }
 
     public class TelegramMarkup
     {
         [JsonPropertyName("inline_keyboard")]
-        public List<TelegramKeyboard> InlineKeyboard { get; set; }
+        public TelegramKeyboard[][] InlineKeyboard { get; set; }
     }
 
     public class TelegramKeyboard

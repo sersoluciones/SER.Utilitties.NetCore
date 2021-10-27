@@ -28,7 +28,7 @@ namespace SER.Utilitties.NetCore.Services
             _logger = loggerFactory.CreateLogger("TelegramMessageWriter");
         }
 
-        public async Task WriteMessage(string message, string channel, string mode = "html")
+        public async Task WriteMessage(string message, string channel, string mode = "html", TelegramMarkup ReplyMarkup = null)
         {
             string token = _config.GetSection("Telegram").GetSection("Token").Value;
             string channelId = _config.GetSection("Telegram").GetSection("Channels").GetSection(channel).Value;
@@ -38,6 +38,7 @@ namespace SER.Utilitties.NetCore.Services
                 ChatId = channelId,
                 ParseMode = mode,
                 Text = message,
+                ReplyMarkup = ReplyMarkup
             };
             await MakePostClientRequest(model, token);
             //Execute(MakePostRequest(model, token));
