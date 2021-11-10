@@ -241,7 +241,7 @@ namespace SER.Utilitties.NetCore.Services
 
             if (download)
             {
-                return GenerateExcel<object>(result, modelName);
+                return GenerateExcel(result, modelName);
             }
 
             if (!string.IsNullOrEmpty(result))
@@ -259,11 +259,17 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         public static dynamic GenerateExcel(string results, string modelName, Dictionary<string, string> dict = null, bool returnBytes = false)
-        {
-            return GenerateExcel<object>(results, modelName, dict: dict, returnBytes: returnBytes);
-        }
+            => GenerateExcel<object>(results, modelName, dict: dict, returnBytes: returnBytes);
 
         public static dynamic GenerateExcel<T>(string results, string modelName, Dictionary<string, string> dict = null, bool returnBytes = false,
+            IStringLocalizer<T> localizer = null)
+            where T : class
+            => GenerateExcel(results, modelName, customColumns: dict == null ? null : CustomColumnExcel.FromMap(dict), returnBytes: returnBytes, localizer: localizer);
+
+        public static dynamic GenerateExcel(string results, string modelName, List<CustomColumnExcel> customColumns, bool returnBytes = false)
+            => GenerateExcel<object>(results, modelName, customColumns: customColumns, returnBytes: returnBytes);
+
+        public static dynamic GenerateExcel<T>(string results, string modelName, List<CustomColumnExcel> customColumns = null, bool returnBytes = false,
             IStringLocalizer<T> localizer = null) where T : class
         {
             byte[] bytes = Array.Empty<byte>();
@@ -291,18 +297,18 @@ namespace SER.Utilitties.NetCore.Services
                         case JsonTokenType.EndArray: break;
                         case JsonTokenType.PropertyName:
                             var name = reader.GetString();
-                            if (dict != null && dict.Values != null && dict.Any(x => x.Key == name))
+                            if (customColumns != null && customColumns.Any(x => x.Key == name))
                             {
                                 // Headers
                                 if (row == 1)
                                 {
                                     using ExcelRange celdas = worksheet.Cells[row, column];
-                                    celdas.Value = dict.First(x => x.Key == name).Value.ToUpper();
+                                    celdas.Value = customColumns.First(x => x.Key == name).Value.ToUpper();
                                 }
                                 draw = true;
                                 column++;
                             }
-                            else if (dict?.Values == null)
+                            else if (customColumns == null)
                             {
                                 // Headers
                                 if (row == 1)
@@ -361,13 +367,13 @@ namespace SER.Utilitties.NetCore.Services
                     }
                 }
 
-                if (row == 1 && dict != null)
+                if (row == 1 && customColumns != null)
                 {
-                    foreach (var key in dict.Values)
+                    foreach (var value in customColumns.Select(x => x.Value))
                     {
                         using (ExcelRange Cells = worksheet.Cells[row, column])
                         {
-                            Cells.Value = key.ToUpper();
+                            Cells.Value = value.ToUpper();
                         }
 
                         column++;
@@ -420,7 +426,10 @@ namespace SER.Utilitties.NetCore.Services
                 return stream;
         }
 
-        public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> keys, bool returnBytes = false) where M : class
+        public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> dict, int sizeHeader = 1, bool returnBytes = false) where M : class
+            => GenerateXlsx(items, CustomColumnExcel.FromMap(dict), sizeHeader: sizeHeader, returnBytes: returnBytes);
+
+        public static dynamic GenerateXlsx<M>(List<M> items, List<CustomColumnExcel> columns, int sizeHeader = 1, bool returnBytes = false) where M : class
         {
             var _xlsxHelpers = new XlsxHelpers();
             MemoryStream stream = new();
@@ -432,24 +441,39 @@ namespace SER.Utilitties.NetCore.Services
                 int Row = 1;
                 int column = 1;
 
-                foreach (var key in keys.Values)
+                foreach (var param in columns)
                 {
-                    using (ExcelRange Cells = Worksheet.Cells[Row, column])
+                    using (ExcelRange Cells = Worksheet.Cells[param.Row, column])
                     {
-                        Cells.Value = key;
-                        //_xlsxHelpers.MakeTitle(Cells);
+                        Cells.Value = param.Value.FirstCharToUpper();
+                        if (!string.IsNullOrEmpty(param.Merge))
+                        {
+                            var range = Cells[param.Merge].Merge = true;
+                            Cells.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                            Cells.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                        }
                     }
 
+                    if (param.CustomRow != null)
+                    {
+                        using ExcelRange Cells = Worksheet.Cells[param.CustomRow.Row, column];
+                        Cells.Value = param.CustomRow.Value.FirstCharToUpper();
+                        if (!string.IsNullOrEmpty(param.CustomRow.Merge))
+                        {
+                            var range = Cells[param.CustomRow.Merge].Merge = true;
+                            Cells.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                            Cells.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                        }
+                    }
                     column++;
                 }
 
-
-                Row++;
+                Row = sizeHeader + 1;
 
                 foreach (var item in items)
                 {
                     column = 1;
-                    foreach (var key in keys.Keys)
+                    foreach (var key in columns.Select(x => x.Key))
                     {
                         using (ExcelRange Cells = Worksheet.Cells[Row, column])
                         {
@@ -588,5 +612,39 @@ namespace SER.Utilitties.NetCore.Services
                 Cells.Value = value;
             }
         }
+    }
+
+
+    public partial class CustomColumnExcel
+    {
+        public CustomColumnExcel() { }
+
+        public CustomColumnExcel(string Key, string Value) { this.Key = Key; this.Value = Value; }
+        public CustomColumnExcel(string Key, string Value, string Merge) { this.Key = Key; this.Value = Value; this.Merge = Merge; }
+        public string Key { get; set; }
+        public string Value { get; set; }
+        public string Merge { get; set; }
+        public int Row { get; set; } = 1;
+        public CustomRowExcel CustomRow { get; set; }
+    }
+
+    public partial class CustomColumnExcel
+    {
+        public static List<CustomColumnExcel> FromMap(Dictionary<string, string> dict)
+        {
+            List<CustomColumnExcel> items = new();
+            foreach (var item in dict)
+            {
+                items.Add(new CustomColumnExcel(item.Key, item.Value));
+            }
+            return items;
+        }
+    }
+
+    public class CustomRowExcel
+    {
+        public string Value { get; set; }
+        public string Merge { get; set; }
+        public int Row { get; set; } = 1;
     }
 }
