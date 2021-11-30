@@ -446,6 +446,15 @@ namespace SER.Utilitties.NetCore.Services
                     using (ExcelRange Cells = Worksheet.Cells[param.Row, column])
                     {
                         Cells.Value = param.Value.FirstCharToUpper();
+                        Cells.Style.Font.Bold = param.HeaderFontBold;
+                        if (param.HeaderFontColor != null)
+                            Cells.Style.Font.Color.SetColor(param.HeaderFontColor.Value);
+                        if (param.HeaderBackgroundColor != null)
+                        {
+                            Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            Cells.Style.Fill.BackgroundColor.SetColor(param.HeaderBackgroundColor.Value);
+                        }
+
                         if (!string.IsNullOrEmpty(param.Merge))
                         {
                             var range = Cells[param.Merge].Merge = true;
@@ -458,6 +467,16 @@ namespace SER.Utilitties.NetCore.Services
                     {
                         using ExcelRange Cells = Worksheet.Cells[param.CustomRow.Row, column];
                         Cells.Value = param.CustomRow.Value.FirstCharToUpper();
+
+                        Cells.Style.Font.Bold = param.CustomRow.FontBold;
+                        if (param.CustomRow.FontColor != null)
+                            Cells.Style.Font.Color.SetColor(param.CustomRow.FontColor.Value);
+                        if (param.CustomRow.BackgroundColor != null)
+                        {
+                            Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            Cells.Style.Fill.BackgroundColor.SetColor(param.CustomRow.BackgroundColor.Value);
+                        }
+
                         if (!string.IsNullOrEmpty(param.CustomRow.Merge))
                         {
                             var range = Cells[param.CustomRow.Merge].Merge = true;
@@ -486,14 +505,14 @@ namespace SER.Utilitties.NetCore.Services
                                     type = type.GetGenericArguments()[0];
 
                                 var value = prop.GetValue(item);
-                                RenderRow(Cells, key, value, type);
+                                RenderRow(Cells, key, value, type, columns.FirstOrDefault(x => x.Key == key));
                             }
                             else if (typeof(M) == typeof(ExpandoObject))
                             {
                                 IDictionary<string, object> propertyValues = item as ExpandoObject;
 
                                 var property = propertyValues.FirstOrDefault(x => x.Key == key);
-                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType());
+                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType(), columns.FirstOrDefault(x => x.Key == key));
 
                             }
                         }
@@ -537,9 +556,21 @@ namespace SER.Utilitties.NetCore.Services
                 return stream;
         }
 
-        private static void RenderRow(ExcelRange Cells, string key, object value, Type type)
+        private static void RenderRow(ExcelRange Cells, string key, object value, Type type, CustomColumnExcel customColumnExcel)
         {
             var numberformat = "#,##0";
+
+            if (customColumnExcel != null)
+            {
+                Cells.Style.Font.Bold = customColumnExcel.FontBold;
+                if (customColumnExcel.FontColor != null)
+                    Cells.Style.Font.Color.SetColor(customColumnExcel.FontColor.Value);
+                if (customColumnExcel.BackgroundColor != null)
+                {
+                    Cells.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    Cells.Style.Fill.BackgroundColor.SetColor(customColumnExcel.BackgroundColor.Value);
+                }
+            }
 
             if (value is null)
             {
@@ -573,20 +604,20 @@ namespace SER.Utilitties.NetCore.Services
             }
             else if (type == typeof(float))
             {
-                numberformat = "#,###0.0";
+                numberformat = customColumnExcel?.CellFormat ?? "#,###0.0";
                 Cells.Style.Numberformat.Format = numberformat;
                 Cells.Value = (float)value;
             }
             else if (type == typeof(decimal))
             {
                 //number with 2 decimal places and thousand separator and money symbol
-                numberformat = "$#,##0.00";
+                numberformat = customColumnExcel?.CellFormat ?? "$#,##0.00";
                 Cells.Style.Numberformat.Format = numberformat;
                 Cells.Value = (decimal)value;
             }
             else if (type == typeof(double))
             {
-                numberformat = "#,###0.00";
+                numberformat = customColumnExcel?.CellFormat ?? "#,###0.00";
                 Cells.Style.Numberformat.Format = numberformat;
                 Cells.Value = (double)value;
             }
@@ -603,8 +634,8 @@ namespace SER.Utilitties.NetCore.Services
             else if (type == typeof(DateTime))
             {
                 var time = (DateTime)value;
-                if (time == time.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM";
+                if (time == time.Date) Cells.Style.Numberformat.Format = customColumnExcel?.CellFormat ?? "dd/mm/yyyy";
+                else Cells.Style.Numberformat.Format = customColumnExcel?.CellFormat ?? "dd/mm/yyyy HH:MM";
                 Cells.Value = time;
             }
             else
@@ -625,6 +656,16 @@ namespace SER.Utilitties.NetCore.Services
         public string Value { get; set; }
         public string Merge { get; set; }
         public int Row { get; set; } = 1;
+
+        public bool HeaderFontBold { get; set; }
+        public Color? HeaderBackgroundColor { get; set; }
+        public Color? HeaderFontColor { get; set; }
+
+        public bool FontBold { get; set; }
+        public Color? BackgroundColor { get; set; }
+        public Color? FontColor { get; set; }
+        public string CellFormat { get; set; } = null;
+
         public CustomRowExcel CustomRow { get; set; }
     }
 
@@ -646,5 +687,10 @@ namespace SER.Utilitties.NetCore.Services
         public string Value { get; set; }
         public string Merge { get; set; }
         public int Row { get; set; } = 1;
+        public bool FontBold { get; set; }
+        public Color? BackgroundColor { get; set; }
+        public Color? FontColor { get; set; }
+
+
     }
 }
