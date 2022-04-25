@@ -97,7 +97,7 @@ namespace SER.Utilitties.NetCore.Services
             };
             var document = JsonDocument.Parse(jsonString, documentOptions);
             Console.WriteLine(jsonString);
-            var request = new RestRequest(endPoint, Method.GET)
+            var request = new RestRequest(endPoint, Method.Get)
             {
                 RequestFormat = DataFormat.Json
             };

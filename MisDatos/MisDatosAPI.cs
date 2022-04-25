@@ -48,7 +48,7 @@ namespace SER.Utilitties.NetCore.MisDatos
         /// <returns></returns>
         public async Task<ResponseChildData> FetchChildAsync(PersonData model)
         {
-            return await Execute<ResponseChildData>(MakePostRequest(model, endPoint: "registraduria/civilRegisty", baseUrl: "https://mdapi-microservices.dinamicadigital.cloud/api/" ));
+            return await Execute<ResponseChildData>(MakePostRequest(model, endPoint: "registraduria/civilRegisty", baseUrl: "https://mdapi-microservices.dinamicadigital.cloud/api/"));
         }
 
         public async Task<ResponseCompanyData> FetchCompanyAsync(string nit)
@@ -61,7 +61,7 @@ namespace SER.Utilitties.NetCore.MisDatos
 
         private RestRequest MakeGetRequest(dynamic model, string endPoint = "")
         {
-            var request = new RestRequest(endPoint, Method.GET);
+            var request = new RestRequest(endPoint, Method.Get);
             request.AddHeader("authorization", _auth);
 
             if (model.GetType() != typeof(string))
@@ -80,7 +80,7 @@ namespace SER.Utilitties.NetCore.MisDatos
             }
             else if (model is string)
             {
-                request.AddParameter(model, model, ParameterType.GetOrPost);
+                request.AddParameter(model as string, model as string, ParameterType.GetOrPost);
             }
             return request;
         }
@@ -91,7 +91,7 @@ namespace SER.Utilitties.NetCore.MisDatos
             {
                 _client = new RestClient(baseUrl);
             }
-            var request = new RestRequest(endPoint, Method.POST);
+            var request = new RestRequest(endPoint, Method.Post);
             request.AddHeader("Authorization", _auth);
             var jsonString = JsonSerializer.Serialize(model);
             var documentOptions = new JsonDocumentOptions

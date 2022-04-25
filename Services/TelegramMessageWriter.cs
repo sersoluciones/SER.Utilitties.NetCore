@@ -46,7 +46,7 @@ namespace SER.Utilitties.NetCore.Services
 
         private RestRequest MakePostRequest(TelegramViewModel model, string token)
         {
-            var request = new RestRequest($"/bot{token}/sendMessage", Method.POST)
+            var request = new RestRequest($"/bot{token}/sendMessage", Method.Post)
             {
                 RequestFormat = DataFormat.Json,
             };

@@ -63,7 +63,7 @@ namespace SER.Utilitties.NetCore.Verifik
 
         private async Task<RestRequest> MakeGetRequest(dynamic model, string endPoint = "")
         {
-            var request = new RestRequest(endPoint, Method.GET);
+            var request = new RestRequest(endPoint, Method.Get);
             await VerifyTokenAsync();
             request.AddHeader("authorization", string.Format("Bearer {0}", _accessToken));
 
@@ -81,15 +81,15 @@ namespace SER.Utilitties.NetCore.Verifik
 
             return request;
         }
-
+        
         private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "")
         {
             if (!string.IsNullOrEmpty(baseUrl))
             {
                 _client = new RestClient(baseUrl);
             }
-            var request = new RestRequest(endPoint, Method.POST);
-            var jsonString = JsonSerializer.Serialize(model);            
+            var request = new RestRequest(endPoint, Method.Post);
+            string jsonString = JsonSerializer.Serialize(model);            
             Console.WriteLine($" ---------------- BODY {jsonString} -----------------");
             request.AddJsonBody(jsonString);
 
