@@ -604,7 +604,7 @@ namespace SER.Utilitties.NetCore.Services
             }
             return response;
         }
-        public async Task<dynamic> GetDataFromDBAsync<E>(string query, Dictionary<string, object> Params = null,
+        public async Task<dynamic> GetDataFromDBAsync<E>(string query, Dictionary<string, object> Params = null, List<NpgsqlParameter> NpgsqlParams = null,
            string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true,
            bool serialize = false, string connection = null, string prefix = null, string whereArgs = null)
             where E : class
@@ -713,6 +713,8 @@ namespace SER.Utilitties.NetCore.Services
                     cmd.CommandText = Query;
                     cmd.CommandTimeout = 120;
                     cmd.Parameters.AddRange(cmd.SetSqlParamsPsqlSQL(Params, _logger));
+                    if (NpgsqlParams != null && NpgsqlParams.Count > 0)
+                        cmd.Parameters.AddRange(NpgsqlParams.ToArray());
                     _logger.LogInformation($"Executed DbCommand [Parameters=[{ParamsToString(cmd.Parameters.ToArray())}], " +
                         $"CommandType={cmd.CommandType}, CommandTimeout='{cmd.CommandTimeout}']\n" +
                         $"      Query\n      {cmd.CommandText}");
