@@ -429,7 +429,8 @@ namespace SER.Utilitties.NetCore.Services
         public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> dict, int sizeHeader = 1, bool returnBytes = false) where M : class
             => GenerateXlsx(items, CustomColumnExcel.FromMap(dict), sizeHeader: sizeHeader, returnBytes: returnBytes);
 
-        public static dynamic GenerateXlsx<M>(List<M> items, List<CustomColumnExcel> columns, int sizeHeader = 1, bool returnBytes = false) where M : class
+        public static dynamic GenerateXlsx<M>(List<M> items, List<CustomColumnExcel> columns, int sizeHeader = 1, bool returnBytes = false,
+            int generalWidth = 0, int generalHeight = 0, bool autoFitColumns = true) where M : class
         {
             var _xlsxHelpers = new XlsxHelpers();
             MemoryStream stream = new();
@@ -509,6 +510,8 @@ namespace SER.Utilitties.NetCore.Services
                             }
                             else if (typeof(M) == typeof(ExpandoObject))
                             {
+                                Worksheet.Row(Row).CustomHeight = true;
+
                                 IDictionary<string, object> propertyValues = item as ExpandoObject;
 
                                 var property = propertyValues.FirstOrDefault(x => x.Key == key);
@@ -522,8 +525,17 @@ namespace SER.Utilitties.NetCore.Services
 
                     Row++;
                 }
-                if (Row > 1)
+
+                if (generalWidth > 0)
+                    Worksheet.Cells[Worksheet.Dimension.Address].EntireColumn.Width = generalWidth;
+                else if (autoFitColumns && Row > 1)
                     Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
+
+                if (generalHeight > 0)
+                    Worksheet.Cells[Worksheet.Dimension.Address].EntireRow.Height = generalHeight;
+
+                var rowSelection = Worksheet.Rows[1, Row];
+
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.Font.Name = "Arial";
@@ -581,6 +593,7 @@ namespace SER.Utilitties.NetCore.Services
                 if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
                 else Cells.Value = value.ToString();
 
+                Cells.Style.WrapText = true;
                 if (key == "email")
                 {
                     Cells.Style.Font.UnderLine = true;
