@@ -426,11 +426,13 @@ namespace SER.Utilitties.NetCore.Services
                 return stream;
         }
 
-        public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> dict, int sizeHeader = 1, bool returnBytes = false) where M : class
-            => GenerateXlsx(items, CustomColumnExcel.FromMap(dict), sizeHeader: sizeHeader, returnBytes: returnBytes);
+        public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> dict, int sizeHeader = 1, bool returnBytes = false,
+            int generalWidth = 0, int generalHeight = 0, bool autoFitColumns = true, bool wrapText = false) where M : class
+            => GenerateXlsx(items, CustomColumnExcel.FromMap(dict), sizeHeader: sizeHeader, returnBytes: returnBytes,
+                generalWidth: generalWidth, generalHeight: generalHeight, autoFitColumns: autoFitColumns, wrapText: wrapText);
 
         public static dynamic GenerateXlsx<M>(List<M> items, List<CustomColumnExcel> columns, int sizeHeader = 1, bool returnBytes = false,
-            int generalWidth = 0, int generalHeight = 0, bool autoFitColumns = true) where M : class
+            int generalWidth = 0, int generalHeight = 0, bool autoFitColumns = true, bool wrapText = false) where M : class
         {
             var _xlsxHelpers = new XlsxHelpers();
             MemoryStream stream = new();
@@ -506,7 +508,7 @@ namespace SER.Utilitties.NetCore.Services
                                     type = type.GetGenericArguments()[0];
 
                                 var value = prop.GetValue(item);
-                                RenderRow(Cells, key, value, type, columns.FirstOrDefault(x => x.Key == key));
+                                RenderRow(Cells, key, value, type, columns.FirstOrDefault(x => x.Key == key), wrapText);
                             }
                             else if (typeof(M) == typeof(ExpandoObject))
                             {
@@ -515,7 +517,7 @@ namespace SER.Utilitties.NetCore.Services
                                 IDictionary<string, object> propertyValues = item as ExpandoObject;
 
                                 var property = propertyValues.FirstOrDefault(x => x.Key == key);
-                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType(), columns.FirstOrDefault(x => x.Key == key));
+                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType(), columns.FirstOrDefault(x => x.Key == key), wrapText);
 
                             }
                         }
@@ -528,13 +530,11 @@ namespace SER.Utilitties.NetCore.Services
 
                 if (generalWidth > 0)
                     Worksheet.Cells[Worksheet.Dimension.Address].EntireColumn.Width = generalWidth;
-                else if (autoFitColumns && Row > 1)
-                    Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
-
                 if (generalHeight > 0)
                     Worksheet.Cells[Worksheet.Dimension.Address].EntireRow.Height = generalHeight;
 
-                var rowSelection = Worksheet.Rows[1, Row];
+                if (autoFitColumns && Row > 1)
+                    Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
 
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
@@ -568,7 +568,7 @@ namespace SER.Utilitties.NetCore.Services
                 return stream;
         }
 
-        private static void RenderRow(ExcelRange Cells, string key, object value, Type type, CustomColumnExcel customColumnExcel)
+        private static void RenderRow(ExcelRange Cells, string key, object value, Type type, CustomColumnExcel customColumnExcel, bool wrapText)
         {
             var numberformat = "#,##0";
 
@@ -593,7 +593,7 @@ namespace SER.Utilitties.NetCore.Services
                 if (string.IsNullOrEmpty(value.ToString())) Cells.Value = "-";
                 else Cells.Value = value.ToString();
 
-                Cells.Style.WrapText = true;
+                Cells.Style.WrapText = wrapText;
                 if (key == "email")
                 {
                     Cells.Style.Font.UnderLine = true;
