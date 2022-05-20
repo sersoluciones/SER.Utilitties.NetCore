@@ -271,7 +271,7 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         private string Pagination<E>(string query, out PagedResultBase result,
-            Dictionary<string, object> Params) where E : class
+            Dictionary<string, object> Params, List<NpgsqlParameter> NpgsqlParams = null) where E : class
         {
             result = new PagedResultBase();
             if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("page")).Value.ToString(), out int pageNumber))
@@ -307,7 +307,7 @@ namespace SER.Utilitties.NetCore.Services
 
                 result.current_page = pageNumber;
                 result.page_size = pageSize;
-                result.row_count = GetCountDBAsync(query, Params).Result;
+                result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
 
                 var pageCount = (double)result.row_count / pageSize;
                 result.page_count = (int)Math.Ceiling(pageCount);
@@ -321,7 +321,7 @@ namespace SER.Utilitties.NetCore.Services
         }
 
         private string Pagination(string query, int take, int page, out PagedResultBase result,
-         Dictionary<string, object> Params)
+         Dictionary<string, object> Params, List<NpgsqlParameter> NpgsqlParams = null)
         {
             result = new PagedResultBase();
             StringBuilder st = new StringBuilder();
@@ -354,7 +354,7 @@ namespace SER.Utilitties.NetCore.Services
 
             result.current_page = pageNumber;
             result.page_size = pageSize;
-            result.row_count = GetCountDBAsync(query, Params).Result;
+            result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
 
             var pageCount = (double)result.row_count / pageSize;
             result.page_count = (int)Math.Ceiling(pageCount);
@@ -365,7 +365,7 @@ namespace SER.Utilitties.NetCore.Services
             return st.ToString();
         }
 
-        public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null)
+        public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null, List<NpgsqlParameter> NpgsqlParams = null)
         {
             string SqlConnectionStr = _optionsDelegate.CurrentValue.ConnectionString;
             string Query = @"select count(*) from ( " + query + " ) as p";
@@ -381,6 +381,8 @@ namespace SER.Utilitties.NetCore.Services
                     cmd.CommandText = Query;
                     cmd.CommandTimeout = 120;
                     cmd.Parameters.AddRange(cmd.SetSqlParamsPsqlSQL(Params, _logger));
+                    if (NpgsqlParams != null && NpgsqlParams.Count > 0)
+                        cmd.Parameters.AddRange(NpgsqlParams.ToArray());
                     _logger.LogInformation($"Executed DbCommand [Parameters=[{ParamsToString(cmd.Parameters.ToArray())}], " +
                         $"CommandType={cmd.CommandType}, CommandTimeout='{cmd.CommandTimeout}']\n" +
                         $"      Query\n      {cmd.CommandText}");
@@ -403,7 +405,7 @@ namespace SER.Utilitties.NetCore.Services
 
         public async Task<string> GetDataFromDBAsync(string query, Dictionary<string, object> Params = null,
          string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true, string take = null, string page = null,
-         string queryCount = null, string connection = null)
+         string queryCount = null, string connection = null, List<NpgsqlParameter> NpgsqlParams = null)
         {
             string SqlConnectionStr = connection ?? _optionsDelegate.CurrentValue.ConnectionString;
 
@@ -428,7 +430,7 @@ namespace SER.Utilitties.NetCore.Services
                 if (take != null && page != null && int.TryParse(take, out int n) && int.TryParse(page, out int m))
                 {
                     if (Params == null) Params = new Dictionary<string, object>();
-                    var paginate = Pagination(queryCount ?? Query, n, m, out pageResult, Params);
+                    var paginate = Pagination(queryCount ?? Query, n, m, out pageResult, Params, NpgsqlParams: NpgsqlParams);
 
                     if (!string.IsNullOrEmpty(paginate))
                         Query = string.Format("{0}\n{1}", Query, paginate);
@@ -675,7 +677,7 @@ namespace SER.Utilitties.NetCore.Services
                 if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("page")))
                 {
                     if (Params == null) Params = new Dictionary<string, object>();
-                    var paginate = Pagination<E>(Query, out pageResult, Params);
+                    var paginate = Pagination<E>(Query, out pageResult, Params, NpgsqlParams: NpgsqlParams);
 
                     if (!string.IsNullOrEmpty(paginate))
                         Query = string.Format("{0}\n{1}", Query, paginate);
