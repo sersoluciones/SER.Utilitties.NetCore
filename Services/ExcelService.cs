@@ -282,34 +282,85 @@ namespace SER.Utilitties.NetCore.Services
 
                 int row = 1;
                 int column = 1;
-
-                var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(results));
                 var draw = true;
                 var numberformat = "#,##0";
+                var listMap = new List<Dictionary<string, dynamic>>();
+
+                var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(results));
+                var map = new Dictionary<string, dynamic>();
+
                 while (reader.Read())
                 {
-                    using ExcelRange Cells = worksheet.Cells[row + 1, column - 1 == 0 ? 1 : column - 1];
-                    switch (reader.TokenType)
+                    if (customColumns != null)
                     {
-                        case JsonTokenType.StartObject: column = 1; break;
-                        case JsonTokenType.EndObject: row++; break;
-                        case JsonTokenType.StartArray:
-                        case JsonTokenType.EndArray: break;
-                        case JsonTokenType.PropertyName:
-                            var name = reader.GetString();
-                            if (customColumns != null && customColumns.Any(x => x.Key == name))
-                            {
-                                // Headers
-                                if (row == 1)
+                        JsonTokenType tokenType = reader.TokenType;
+
+                        switch (tokenType)
+                        {
+                            case JsonTokenType.StartArray:
+                            case JsonTokenType.EndArray: break;
+                            case JsonTokenType.EndObject:
+                                //Console.WriteLine($" ----------- map {JsonSerializer.Serialize(map)} ------------- ");
+                                listMap.Add(map);
+                                break;
+                            case JsonTokenType.StartObject:
+                                map = new Dictionary<string, dynamic>();
+                                break;
+                            case JsonTokenType.PropertyName:
+                                var name = reader.GetString();
+                                //  reader.ValueTextEquals(Encoding.UTF8.GetBytes("name"))
+                                if (customColumns.Any(x => x.Key == name))
                                 {
-                                    using ExcelRange celdas = worksheet.Cells[row, column];
-                                    celdas.Value = customColumns.First(x => x.Key == name).Value.ToUpper();
+                                    // Assume valid JSON, known schema
+                                    reader.Read();
+                                    switch (reader.TokenType)
+                                    {
+                                        case JsonTokenType.String:
+                                            map.Add(name, reader.GetString());
+                                            break;
+                                        case JsonTokenType.Number:
+                                            if (reader.TryGetInt32(out int @int))
+                                            {
+                                                map.Add(name, @int);
+                                            }
+                                            else if (reader.TryGetDouble(out double @Double))
+                                            {
+                                                map.Add(name, @Double);
+                                            }
+                                            else
+                                                map.Add(name, reader.GetDouble());
+
+                                            break;
+                                        case JsonTokenType.None:
+                                        case JsonTokenType.Null:
+                                            map.Add(name, null);
+                                            break;
+                                        case JsonTokenType.False:
+                                            map.Add(name, false);
+                                            break;
+                                        case JsonTokenType.True:
+                                            map.Add(name, true);
+                                            break;
+                                        default: break;
+                                    }
                                 }
-                                draw = true;
-                                column++;
-                            }
-                            else if (customColumns == null)
-                            {
+                                break;
+
+                        }
+
+                    }
+                    else
+                    {
+
+                        using ExcelRange Cells = worksheet.Cells[row + 1, column - 1 == 0 ? 1 : column - 1];
+                        switch (reader.TokenType)
+                        {
+                            case JsonTokenType.StartObject: column = 1; break;
+                            case JsonTokenType.EndObject: row++; break;
+                            case JsonTokenType.StartArray:
+                            case JsonTokenType.EndArray: break;
+                            case JsonTokenType.PropertyName:
+                                var name = reader.GetString();
                                 // Headers
                                 if (row == 1)
                                 {
@@ -318,66 +369,115 @@ namespace SER.Utilitties.NetCore.Services
                                 }
                                 draw = true;
                                 column++;
-                            }
-                            else
-                                draw = false;
-                            break;
-                        case JsonTokenType.String:
-                            if (!draw) break;
+                                break;
+                            case JsonTokenType.String:
+                                if (!draw) break;
 
-                            if (reader.TryGetDateTime(out DateTime @Datetime))
-                            {
-                                if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
-                                Cells.Value = @Datetime;
-                            }
-                            /*else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
-                            {
-                                //number with 2 decimal places and thousand separator and money symbol
-                                numberformat = "$#,##0.00";
-                                Cells.Style.Numberformat.Format = numberformat;
-                                Cells.Value = @Decimal;
-                            }*/
-                            else
-                                Cells.Value = reader.GetString();
+                                if (reader.TryGetDateTime(out DateTime @Datetime))
+                                {
+                                    if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                    Cells.Value = @Datetime;
+                                }
+                                /*else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
+                                {
+                                    //number with 2 decimal places and thousand separator and money symbol
+                                    numberformat = "$#,##0.00";
+                                    Cells.Style.Numberformat.Format = numberformat;
+                                    Cells.Value = @Decimal;
+                                }*/
+                                else
+                                    Cells.Value = reader.GetString();
+                                break;
+                            case JsonTokenType.Number:
+                                if (!draw) break;
 
-                            break;
-                        case JsonTokenType.Number:
-                            if (!draw) break;
-                            if (reader.TryGetInt32(out int @int))
-                            {
-                                Cells.Value = @int;
-                            }
-                            else if (reader.TryGetDouble(out double @Double))
-                            {
-                                numberformat = "#,###0.0";
-                                Cells.Style.Numberformat.Format = numberformat;
-                                Cells.Value = @Double;
-                            }
-                            else
-                            {
-                                Cells.Value = reader.GetDouble();
-                            }
-                            break;
-                        case JsonTokenType.None:
-                        case JsonTokenType.Null: break;
-                        case JsonTokenType.False: if (!draw) break; Cells.Value = "No"; break;
-                        case JsonTokenType.True: if (!draw) break; Cells.Value = "Si"; break;
-                        default: break;
+                                if (reader.TryGetInt32(out int @int))
+                                {
+                                    Cells.Value = @int;
+                                }
+                                else if (reader.TryGetDouble(out double @Double))
+                                {
+                                    numberformat = "#,###0.0";
+                                    Cells.Style.Numberformat.Format = numberformat;
+                                    Cells.Value = @Double;
+                                }
+                                else
+                                {
+                                    Cells.Value = reader.GetDouble();
+                                }
+                                break;
+                            case JsonTokenType.None:
+                            case JsonTokenType.Null: break;
+                            case JsonTokenType.False:
+                                if (!draw) break; Cells.Value = "No";
+                                break;
+                            case JsonTokenType.True:
+                                if (!draw) break; Cells.Value = "Si";
+                                break;
+                            default: break;
+                        }
                     }
+
                 }
 
-                if (row == 1 && customColumns != null)
+                if (customColumns != null)
                 {
-                    foreach (var value in customColumns.Select(x => x.Value))
+                    foreach (var dictionary in listMap)
                     {
-                        using (ExcelRange Cells = worksheet.Cells[row, column])
+                        column = 1;
+                        foreach (var key in customColumns.Select(x => x.Key))
                         {
-                            Cells.Value = value.ToUpper();
+                            if (row == 1)
+                            {
+                                using ExcelRange Cells = worksheet.Cells[row, column];
+                                Cells.Value = customColumns.First(x => x.Key == key).Value.ToUpper();
+                            }
+                            else
+                            {
+                                using ExcelRange Cells = worksheet.Cells[row, column];
+                                var obj = dictionary[key];
+                                if (obj is string)
+                                {
+                                    if (DateTime.TryParse(obj as string, out DateTime @Datetime))
+                                    {
+                                        if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                        else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                        Cells.Value = @Datetime;
+                                    }
+                                    else
+                                        Cells.Value = obj;
+                                }
+                                else if (obj is int)
+                                {
+                                    Cells.Value = obj;
+                                }
+                                else if (obj is double)
+                                {
+                                    numberformat = "#,###0.0";
+                                    Cells.Style.Numberformat.Format = numberformat;
+                                    Cells.Value = obj;
+                                }
+                                else if (obj is bool)
+                                {
+                                    if (obj == true) Cells.Value = "Si";
+                                    else Cells.Value = "No";
+                                }
+                                else if (obj is null)
+                                {
+                                    Cells.Value = "";
+                                }
+                                else
+                                {
+                                    Cells.Value = "";
+                                }
+                            }
+                            column++;
                         }
-
-                        column++;
+                        row++;
                     }
+
+
                 }
 
                 // para booleanos
@@ -425,6 +525,7 @@ namespace SER.Utilitties.NetCore.Services
             else
                 return stream;
         }
+
 
         public static dynamic GenerateXlsx<M>(List<M> items, Dictionary<string, string> dict, int sizeHeader = 1, bool returnBytes = false,
             int generalWidth = 0, int generalHeight = 0, bool autoFitColumns = true, bool wrapText = false) where M : class
