@@ -316,7 +316,11 @@ namespace SER.Utilitties.NetCore.Services
                                     switch (reader.TokenType)
                                     {
                                         case JsonTokenType.String:
-                                            map.Add(name, reader.GetString());
+                                            if (reader.TryGetDateTime(out DateTime @Datetime))
+                                                map.Add(name, @Datetime);
+                                            else
+                                                map.Add(name, reader.GetString());
+
                                             break;
                                         case JsonTokenType.Number:
                                             if (reader.TryGetInt32(out int @int))
@@ -439,14 +443,13 @@ namespace SER.Utilitties.NetCore.Services
                                 var obj = dictionary[key];
                                 if (obj is string)
                                 {
-                                    if (DateTime.TryParse(obj as string, out DateTime @Datetime))
-                                    {
-                                        if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                        else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
-                                        Cells.Value = @Datetime;
-                                    }
-                                    else
-                                        Cells.Value = obj;
+                                    Cells.Value = obj;
+                                }
+                                else if (obj is DateTime)
+                                {
+                                    if (obj == obj.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                    Cells.Value = obj;
                                 }
                                 else if (obj is int)
                                 {
