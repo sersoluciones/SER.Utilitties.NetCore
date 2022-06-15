@@ -380,7 +380,7 @@ namespace SER.Utilitties.NetCore.Services
                                 if (reader.TryGetDateTime(out DateTime @Datetime))
                                 {
                                     if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";                                   
                                     Cells.Value = @Datetime;
                                 }
                                 /*else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
@@ -427,54 +427,57 @@ namespace SER.Utilitties.NetCore.Services
 
                 if (customColumns != null)
                 {
+                    column = 1;
+                    foreach (var key in customColumns.Select(x => x.Key))
+                    {
+                        using ExcelRange Cells = worksheet.Cells[row, column];
+                        Cells.Value = customColumns.First(x => x.Key == key).Value.ToUpper();
+                        column++;
+                    }
+                    row++;
+
                     foreach (var dictionary in listMap)
                     {
                         column = 1;
                         foreach (var key in customColumns.Select(x => x.Key))
                         {
-                            if (row == 1)
+                            using ExcelRange Cells = worksheet.Cells[row, column];
+                            var obj = dictionary[key];
+                            if (obj is string)
                             {
-                                using ExcelRange Cells = worksheet.Cells[row, column];
-                                Cells.Value = customColumns.First(x => x.Key == key).Value.ToUpper();
+                                Cells.Value = obj;
+                            }
+                            else if (obj is DateTime)
+                            {
+                                Console.WriteLine($" read excel datetime --------- > {obj}");
+                                if (obj == obj.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
+                                else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
+                                Cells.Value = obj;
+                            }
+                            else if (obj is int)
+                            {
+                                Cells.Value = obj;
+                            }
+                            else if (obj is double)
+                            {
+                                numberformat = "#,###0.0";
+                                Cells.Style.Numberformat.Format = numberformat;
+                                Cells.Value = obj;
+                            }
+                            else if (obj is bool)
+                            {
+                                if (obj == true) Cells.Value = "Si";
+                                else Cells.Value = "No";
+                            }
+                            else if (obj is null)
+                            {
+                                Cells.Value = "";
                             }
                             else
                             {
-                                using ExcelRange Cells = worksheet.Cells[row, column];
-                                var obj = dictionary[key];
-                                if (obj is string)
-                                {
-                                    Cells.Value = obj;
-                                }
-                                else if (obj is DateTime)
-                                {
-                                    if (obj == obj.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
-                                    Cells.Value = obj;
-                                }
-                                else if (obj is int)
-                                {
-                                    Cells.Value = obj;
-                                }
-                                else if (obj is double)
-                                {
-                                    numberformat = "#,###0.0";
-                                    Cells.Style.Numberformat.Format = numberformat;
-                                    Cells.Value = obj;
-                                }
-                                else if (obj is bool)
-                                {
-                                    if (obj == true) Cells.Value = "Si";
-                                    else Cells.Value = "No";
-                                }
-                                else if (obj is null)
-                                {
-                                    Cells.Value = "";
-                                }
-                                else
-                                {
-                                    Cells.Value = "";
-                                }
+                                Cells.Value = "";
                             }
+
                             column++;
                         }
                         row++;
