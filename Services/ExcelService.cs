@@ -449,7 +449,6 @@ namespace SER.Utilitties.NetCore.Services
                             }
                             else if (obj is DateTime)
                             {
-                                Console.WriteLine($" read excel datetime --------- > {obj}");
                                 if (obj == obj.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
                                 else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
                                 Cells.Value = obj;
