@@ -37,7 +37,7 @@ namespace SER.Utilitties.NetCore.Utilities
             var bufferWriter = new ArrayBufferWriter<byte>();
             using (var writer = new Utf8JsonWriter(bufferWriter))
                 element.WriteTo(writer);
-            return System.Text.Json.JsonSerializer.Deserialize<T>(bufferWriter.WrittenSpan, null);
+            return System.Text.Json.JsonSerializer.Deserialize<T>(bufferWriter.WrittenSpan, options: null);
         }
         public static T ToObject<T>(this JsonElement element, JsonSerializerOptions options = null)
         {
