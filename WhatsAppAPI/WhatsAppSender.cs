@@ -39,19 +39,20 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         /// <param name="number"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public async Task SendSmsAsync(string number, string message)
+        public async Task SendSmsAsync(string number, string? message = null, string templateName = "sending_code")
         {
             var model = new MsgWhatsApp
             {
                 To = number,
                 Template = new Template
                 {
+                    Name = templateName,
                     Language = new Language(),
                     Components = new Component[]
                     {
                         new Component
                         {
-                            Parameters = new Parameter[]
+                            Parameters = message == null ? null : new Parameter[]
                             {
                                 new Parameter
                                 {

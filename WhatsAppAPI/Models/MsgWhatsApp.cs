@@ -23,17 +23,17 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("template")]
         public Template Template { get; set; }
     }
-
+#nullable enable
     public partial class Template
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = "sending_code";
 
         [JsonPropertyName("language")]
-        public Language Language { get; set; }
+        public Language? Language { get; set; }
 
         [JsonPropertyName("components")]
-        public Component[] Components { get; set; }
+        public Component[]? Components { get; set; }
     }
 
     public partial class Component
@@ -42,7 +42,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         public string Type { get; set; } = "body";
 
         [JsonPropertyName("parameters")]
-        public Parameter[] Parameters { get; set; }
+        public Parameter[]? Parameters { get; set; }
     }
 
     public partial class Parameter
@@ -51,9 +51,9 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         public string Type { get; set; } = "text";
 
         [JsonPropertyName("text")]
-        public string Text { get; set; }
+        public string? Text { get; set; }
     }
-
+#nullable disable
     public partial class Language
     {
         [JsonPropertyName("code")]

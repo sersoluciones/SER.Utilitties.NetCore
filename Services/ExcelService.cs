@@ -402,8 +402,12 @@ namespace SER.Utilitties.NetCore.Services
                                 }
                                 else if (reader.TryGetDouble(out double @Double))
                                 {
-                                    numberformat = "#,###0.0";
-                                    Cells.Style.Numberformat.Format = numberformat;
+                                    // verifica si es entero el numero
+                                    if (@Double % 1 != 0)
+                                    {
+                                        numberformat = "#,###0.0";
+                                        Cells.Style.Numberformat.Format = numberformat;
+                                    }
                                     Cells.Value = @Double;
                                 }
                                 else
@@ -459,8 +463,12 @@ namespace SER.Utilitties.NetCore.Services
                             }
                             else if (obj is double)
                             {
-                                numberformat = "#,###0.0";
-                                Cells.Style.Numberformat.Format = numberformat;
+                                // verifica si es entero el numero
+                                if (obj % 1 != 0)
+                                {
+                                    numberformat = "#,###0.0";
+                                    Cells.Style.Numberformat.Format = numberformat;
+                                }                               
                                 Cells.Value = obj;
                             }
                             else if (obj is bool)
@@ -723,21 +731,35 @@ namespace SER.Utilitties.NetCore.Services
             }
             else if (type == typeof(float))
             {
-                numberformat = customColumnExcel?.CellFormat ?? "#,###0.0";
-                Cells.Style.Numberformat.Format = numberformat;
+                if ((float)value % 1 != 0)
+                {
+                    numberformat = customColumnExcel?.CellFormat ?? "#,###0.0";
+                    Cells.Style.Numberformat.Format = numberformat;
+                }
                 Cells.Value = (float)value;
             }
             else if (type == typeof(decimal))
             {
-                //number with 2 decimal places and thousand separator and money symbol
-                numberformat = customColumnExcel?.CellFormat ?? "$#,##0.00";
-                Cells.Style.Numberformat.Format = numberformat;
+                if ((decimal)value % 1 != 0)
+                {
+                    //number with 2 decimal places and thousand separator and money symbol
+                    numberformat = customColumnExcel?.CellFormat ?? "$#,##0.00";
+                    Cells.Style.Numberformat.Format = numberformat;
+                }
+                else
+                {
+                    numberformat = customColumnExcel?.CellFormat ?? "$#,##";
+                    Cells.Style.Numberformat.Format = numberformat;
+                }
                 Cells.Value = (decimal)value;
             }
             else if (type == typeof(double))
             {
-                numberformat = customColumnExcel?.CellFormat ?? "#,###0.00";
-                Cells.Style.Numberformat.Format = numberformat;
+                if ((double)value % 1 != 0)
+                {
+                    numberformat = customColumnExcel?.CellFormat ?? "#,###0.00";
+                    Cells.Style.Numberformat.Format = numberformat;
+                }
                 Cells.Value = (double)value;
             }
             else if (type == typeof(bool))
