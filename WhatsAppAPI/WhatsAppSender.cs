@@ -6,6 +6,8 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Parameter = SER.Utilitties.NetCore.WhatsAppAPI.Models.Parameter;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SER.Utilitties.NetCore.WhatsAppAPI
 {
@@ -67,6 +69,46 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         }
 
 
+        public async Task SendSmsAsync(string number, List<string> messages, string templateName)
+        {
+            var model = new MsgWhatsApp
+            {
+                To = number,
+                Template = new Template
+                {
+                    Name = templateName,
+                    Language = new Language(),
+                    Components = new Component[]
+                    {
+                        new Component
+                        {
+                            Parameters = messages.Select(message => new Parameter
+                            {
+                                Text = message,
+                            }).ToArray(),
+                        }
+                    }
+                }
+            };
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
+
+        public async Task SendSmsAsync(string number, List<Component> components, string templateName)
+        {
+            var model = new MsgWhatsApp
+            {
+                To = number,
+                Template = new Template
+                {
+                    Name = templateName,
+                    Language = new Language(),
+                    Components = components.ToArray(),
+                }
+            };
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
         private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "")
         {
             if (!string.IsNullOrEmpty(baseUrl))
@@ -76,7 +118,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
             var request = new RestRequest(endPoint, Method.Post);
             request.AddHeader("authorization", string.Format("Bearer {0}", _accessToken));
 
-            string jsonString = JsonSerializer.Serialize(model);            
+            string jsonString = JsonSerializer.Serialize(model);
             Console.WriteLine($" ---------------- BODY {jsonString} -----------------");
             request.AddJsonBody(jsonString);
 
@@ -105,7 +147,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
             }
         }
 
-      
+
     }
 #nullable disable
 }
