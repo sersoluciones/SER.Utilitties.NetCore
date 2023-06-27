@@ -130,19 +130,20 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
             var response = await _client.ExecuteAsync(request);
             try
             {
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if (response.StatusCode == System.Net.HttpStatusCode.OK && !string.IsNullOrEmpty(response.Content))
                 {
+                    //_logger.LogInformation($"WhatsApp API StatusCode {response.StatusCode} {response.Content}");
                     return JsonSerializer.Deserialize<T>(response.Content);
                 }
                 else
                 {
-                    _logger.LogWarning(string.Format("WhatsApp API StatusCode {0} {1}", response.StatusCode, response.Content));
+                    _logger.LogWarning($"WhatsApp API StatusCode {response.StatusCode} {response.Content}");
                     return null;
                 }
             }
             catch (Exception e)
             {
-                _logger.LogError(string.Format("WhatsApp API {0}\n{1}", response.Content, e.ToString()));
+                _logger.LogError($"WhatsApp API {response.Content}\n{e.ToString()}");
                 throw;
             }
         }

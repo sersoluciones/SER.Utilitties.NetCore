@@ -174,7 +174,12 @@ namespace SER.Utilitties.NetCore.Services
             }
             else
             {
-                if (value.ToLower().Trim() == "null")
+                if (matchStr.Success && matchStr.Value == "¬")
+                {
+                    Params.Add(paramName, $"%{value}%");
+                    select = string.Format("{0}{1}::text ilike {2}", initialClass, key, paramName);
+                }
+                else if (value.ToLower().Trim() == "null")
                 {
                     select = string.Format("{0}{1} is NULL", initialClass, key);
                     //Params.Add(paramName, "NULL");
@@ -183,21 +188,22 @@ namespace SER.Utilitties.NetCore.Services
                 {
                     select = AddParam(Params, paramName, key, initialClass, matchStr, number, matchStr.Value);
                 }
-                else if (float.TryParse(value, out float fnumber))
-                {
-                    select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
-                    Params.Add(paramName, fnumber);
-                }
+                //else if (float.TryParse(value, out float fnumber))
+                //{
+                //    select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
+                //    Params.Add(paramName, fnumber);
+                //}
                 else if (double.TryParse(value, out double dnumber))
                 {
-                    select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
-                    Params.Add(paramName, dnumber);
+                    //select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
+                    //Params.Add(paramName, dnumber);
+                    select = AddParam(Params, paramName, key, initialClass, matchStr, dnumber, matchStr.Value);
                 }
-                else if (decimal.TryParse(value, out decimal denumber))
-                {
-                    select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
-                    Params.Add(paramName, denumber);
-                }
+                //else if (decimal.TryParse(value, out decimal denumber))
+                //{
+                //    select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
+                //    Params.Add(paramName, denumber);
+                //}
                 else if (bool.TryParse(value, out bool boolean))
                 {
                     select = string.Format("{0}{1} = {2}", initialClass, key, paramName);
