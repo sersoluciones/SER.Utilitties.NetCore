@@ -380,7 +380,7 @@ namespace SER.Utilitties.NetCore.Services
                                 if (reader.TryGetDateTime(out DateTime @Datetime))
                                 {
                                     if (@Datetime == @Datetime.Date) Cells.Style.Numberformat.Format = "dd/mm/yyyy";
-                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";                                   
+                                    else Cells.Style.Numberformat.Format = "dd/mm/yyyy HH:MM:ss";
                                     Cells.Value = @Datetime;
                                 }
                                 /*else if (decimal.TryParse(reader.GetString(), out decimal @Decimal))
@@ -468,7 +468,7 @@ namespace SER.Utilitties.NetCore.Services
                                 {
                                     numberformat = "#,###0.0";
                                     Cells.Style.Numberformat.Format = numberformat;
-                                }                               
+                                }
                                 Cells.Value = obj;
                             }
                             else if (obj is bool)
@@ -731,35 +731,35 @@ namespace SER.Utilitties.NetCore.Services
             }
             else if (type == typeof(float))
             {
-                if ((float)value % 1 != 0)
-                {
-                    numberformat = customColumnExcel?.CellFormat ?? "#,###0.0";
-                    Cells.Style.Numberformat.Format = numberformat;
-                }
+                //if ((float)value % 1 != 0)
+                //{
+                numberformat = customColumnExcel?.CellFormat ?? "#,###0.0";
+                Cells.Style.Numberformat.Format = numberformat;
+                //}
                 Cells.Value = (float)value;
             }
             else if (type == typeof(decimal))
             {
-                if ((decimal)value % 1 != 0)
-                {
-                    //number with 2 decimal places and thousand separator and money symbol
-                    numberformat = customColumnExcel?.CellFormat ?? "$#,##0.00";
-                    Cells.Style.Numberformat.Format = numberformat;
-                }
-                else
-                {
-                    numberformat = customColumnExcel?.CellFormat ?? "$#,##";
-                    Cells.Style.Numberformat.Format = numberformat;
-                }
+                //if ((decimal)value % 1 != 0)
+                //{
+                //number with 2 decimal places and thousand separator and money symbol
+                numberformat = customColumnExcel?.CellFormat ?? "$#,##0.00";
+                Cells.Style.Numberformat.Format = numberformat;
+                //}
+                //else
+                //{
+                //    numberformat = customColumnExcel?.CellFormat ?? "$#,##";
+                //    Cells.Style.Numberformat.Format = numberformat;
+                //}
                 Cells.Value = (decimal)value;
             }
             else if (type == typeof(double))
             {
-                if ((double)value % 1 != 0)
-                {
-                    numberformat = customColumnExcel?.CellFormat ?? "#,###0.00";
-                    Cells.Style.Numberformat.Format = numberformat;
-                }
+                //if ((double)value % 1 != 0)
+                //{
+                numberformat = customColumnExcel?.CellFormat ?? "#,###0.00";
+                Cells.Style.Numberformat.Format = numberformat;
+                //}
                 Cells.Value = (double)value;
             }
             else if (type == typeof(bool))
