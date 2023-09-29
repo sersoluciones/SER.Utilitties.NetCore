@@ -41,6 +41,12 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("type")]
         public string Type { get; set; } = "body";
 
+        [JsonPropertyName("sub_type")]
+        public string? SubType { get; set; }
+
+        [JsonPropertyName("index")]
+        public string? Index { get; set; }
+
         [JsonPropertyName("parameters")]
         public Parameter[]? Parameters { get; set; }
     }
