@@ -41,7 +41,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         /// <param name="number"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public async Task SendSmsAsync(string number, string? message = null, string templateName = "sending_code")
+        public async Task SendSmsAsync(string number, string? message = null, string templateName = "sending_code", string language = "es")
         {
             var model = new MsgWhatsApp
             {
@@ -49,7 +49,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 Template = new Template
                 {
                     Name = templateName,
-                    Language = new Language(),
+                    Language = new Language()
+                    {
+                        Code = language
+                    },
                     Components = new Component[]
                     {
                         new Component
@@ -69,7 +72,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         }
 
 
-        public async Task SendSmsAsync(string number, List<string> messages, string templateName)
+        public async Task SendSmsAsync(string number, List<string> messages, string templateName, string language = "es")
         {
             var model = new MsgWhatsApp
             {
@@ -77,7 +80,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 Template = new Template
                 {
                     Name = templateName,
-                    Language = new Language(),
+                    Language = new Language()
+                    {
+                        Code = language
+                    },
                     Components = new Component[]
                     {
                         new Component
@@ -94,7 +100,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         }
 
 
-        public async Task SendSmsAsync(string number, List<Component> components, string templateName)
+        public async Task SendSmsAsync(string number, List<Component> components, string templateName, string language = "es")
         {
             var model = new MsgWhatsApp
             {
@@ -102,7 +108,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 Template = new Template
                 {
                     Name = templateName,
-                    Language = new Language(),
+                    Language = new Language()
+                    {
+                        Code = language
+                    },
                     Components = components.ToArray(),
                 }
             };
