@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Npgsql;
+using SER.Utilitties.NetCore.MisDatos.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -110,7 +111,7 @@ namespace SER.Utilitties.NetCore.Utilities
                 {
                     if (first)
                     {
-                        result.Append(" WHERE ");
+                        result.Append(" WHERE ( ");
                         first = false;
                     }
                     else
@@ -122,6 +123,8 @@ namespace SER.Utilitties.NetCore.Utilities
                 }
                 result.Append(data);
             }
+
+           if (!start) result.Append(" ) ");
             return result.ToString();
         }
 

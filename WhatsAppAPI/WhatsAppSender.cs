@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Parameter = SER.Utilitties.NetCore.WhatsAppAPI.Models.Parameter;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using RateLimiter;
 
 namespace SER.Utilitties.NetCore.WhatsAppAPI
 {
@@ -116,6 +118,44 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 }
             };
             await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
+
+        /// <summary>
+        /// source https://github.com/David-Desmaisons/RateLimiter
+        /// </summary>
+        /// <param name="msgs"></param>
+        /// <returns></returns>
+        public async Task SendingMultipleRequests(List<string> numbers, List<Component> components, string templateName, string language = "es")
+        {
+            var limit = 80; // limite de requests por minuto           
+            var maxLimit = (int)Math.Ceiling(numbers.Count * 1.0 / limit * 1.0);
+            //_logger.LogInformation($" -------------------- maxLimit {maxLimit} ----------------- ");
+            int start = 0;
+            int count = limit;
+            // Create Time constraint: max 80 times by second
+            var timeConstraint = TimeLimiter.GetFromMaxCountByInterval(limit, TimeSpan.FromSeconds(60));
+
+            // Use it
+            for (int i = 0; i < maxLimit; i++)
+            {
+                _logger.LogInformation($" -------------------- grupo index[{start * count}] {start * count} - {(start * count) + count} ------------------ ");
+
+                var j = 1 + (start * count);
+                var requestToSend = numbers.GetRange(start * count, (start * count) + count > numbers.Count ? numbers.Count - (start * count) : count);
+                foreach (var number in requestToSend)
+                {
+                    //_logger.LogInformation($" -------------------- enviando request {j} ------------------ ");
+                    await timeConstraint.Enqueue(() => SendSmsAsync(number, components, templateName, language).ConfigureAwait(false), CancellationToken.None);
+                    j++;
+                }
+
+
+                start += 1;
+            }
+
+            _logger.LogInformation($" -------------------- finising job send requests ------------------ ");
+
         }
 
         private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "")

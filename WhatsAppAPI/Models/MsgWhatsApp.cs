@@ -58,7 +58,19 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
 
         [JsonPropertyName("text")]
         public string? Text { get; set; }
+
+
+        [JsonPropertyName("image")]
+        public ImageComponent? Image { get; set; }
     }
+
+    public class ImageComponent
+    {
+        [JsonPropertyName("link")]
+        public string? Link { get; set; }
+    }
+
+
 #nullable disable
     public partial class Language
     {
