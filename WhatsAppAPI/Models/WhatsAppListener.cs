@@ -108,6 +108,12 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
 
         [JsonPropertyName("type")]
         public string? Type { get; set; }
+
+        [JsonPropertyName("button")]
+        public WButton? Button { get; set; }
+
+        [JsonPropertyName("context")]
+        public WContext? Context { get; set; }
     }
 
     public partial class Text
@@ -123,6 +129,24 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
 
         [JsonPropertyName("phone_number_id")]
         public string? PhoneNumberId { get; set; }
+    }
+
+    public partial class WButton
+    {
+        [JsonPropertyName("payload")]
+        public string? Payload { get; set; }
+
+        [JsonPropertyName("text")]
+        public string? Text { get; set; }
+    }
+
+    public partial class WContext
+    {
+        [JsonPropertyName("from")]
+        public string? From { get; set; }
+
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
     }
 #nullable disable
 }

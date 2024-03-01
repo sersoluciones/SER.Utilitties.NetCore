@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
 		<Company>SER Soluciones</Company>
-		<Version>1.0.10</Version>
+		<Version>1.0.11</Version>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>
 			Utilities for Net 6 to make easier start any project
