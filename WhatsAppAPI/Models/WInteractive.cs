@@ -13,18 +13,29 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("type")]
         public string Type { get; set; } = "list";
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("text")]
+        public WText? Text { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("body")]
-        public WBody Body { get; set; }
+        public WBody? Body { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("footer")]
-        public WFooter Footer { get; set; } = new WFooter();
+        public WFooter? Footer { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("action")]
-        public WAction Action { get; set; } = new WAction();
+        public WAction? Action { get; set; }
 
         public WInteractive(string body)
         {
             Body = new WBody(body);
+        }
+
+        public WInteractive()
+        {
         }
     }
 
@@ -63,6 +74,17 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
             Id = id;
             Title = title;
             Description = description;
+        }
+    }
+
+    public partial class WText
+    {
+        [JsonPropertyName("body")]
+        public string Body { get; set; }
+
+        public WText(string text)
+        {
+            Body = text;
         }
     }
 
