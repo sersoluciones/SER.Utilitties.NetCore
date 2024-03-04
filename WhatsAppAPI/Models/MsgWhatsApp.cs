@@ -9,21 +9,27 @@ using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
 {
+#nullable enable
     public partial class MsgWhatsApp
     {
         [JsonPropertyName("messaging_product")]
         public string MessagingProduct { get; set; } = "whatsapp";
 
         [JsonPropertyName("to")]
-        public string To { get; set; }
+        public string? To { get; set; }
 
         [JsonPropertyName("type")]
         public string Type { get; set; } = "template";
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("template")]
-        public Template Template { get; set; }
+        public Template? Template { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("interactive")]
+        public WInteractive? Interactive { get; set; }
     }
-#nullable enable
+
     public partial class Template
     {
         [JsonPropertyName("name")]

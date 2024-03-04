@@ -121,6 +121,17 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         }
 
 
+        public async Task SendSmsAsync(string number, WInteractive interactive)
+        {
+            var model = new MsgWhatsApp
+            {
+                To = number,
+                Interactive = interactive,
+                Type = "interactive"
+            };
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
         /// <summary>
         /// source https://github.com/David-Desmaisons/RateLimiter
         /// </summary>
