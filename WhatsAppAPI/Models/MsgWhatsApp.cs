@@ -28,6 +28,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("interactive")]
         public WInteractive? Interactive { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("text")]
+        public WText? Text { get; set; }
     }
 
     public partial class Template

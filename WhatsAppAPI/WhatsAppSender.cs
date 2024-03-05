@@ -132,6 +132,24 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
             await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
         }
 
+
+        public async Task SendSmsAsync(string number, WText text)
+        {
+            var model = new MsgWhatsApp
+            {
+                To = number,
+                Text = text,
+                Type = "text"
+            };
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
+
+        public async Task SendSmsAsync(object customObj)
+        {
+            await Execute<ResponseWhatsApp>(MakePostRequest(customObj, endPoint: $"{_phoneNumberId}/messages"));
+        }
+
         /// <summary>
         /// source https://github.com/David-Desmaisons/RateLimiter
         /// </summary>
