@@ -41,11 +41,36 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
 
     public partial class WAction
     {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("button")]
-        public string Button { get; set; } = "Opciones";
+        public string? Button { get; set; } = "Opciones";
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("sections")]
-        public WSection[] Sections { get; set; }
+        public WSection[]? Sections { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("buttons")]
+        public WInteractiveButton[]? Buttons { get; set; }
+    }
+    
+
+    public partial class WInteractiveButton
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "reply";
+
+        [JsonPropertyName("reply")]
+        public WInteractiveReply? Reply { get; set; }
+    }
+
+    public partial class WInteractiveReply
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
     }
 
     public partial class WSection
