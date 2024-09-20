@@ -12,7 +12,6 @@ namespace SER.Utilitties.NetCore.Utilities.JsonConverters
     {
         public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            Console.WriteLine($"-----------------------------time long {reader.GetInt64()}");
             return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(reader.GetInt64());
         }
 

@@ -361,7 +361,7 @@ namespace SER.Utilitties.NetCore.Services
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Exception {e}");
+                    _logger.LogError($"Exception {e}");
                 }
             }
             return obj;

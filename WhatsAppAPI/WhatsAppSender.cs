@@ -197,7 +197,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
             request.AddHeader("authorization", string.Format("Bearer {0}", _accessToken));
 
             string jsonString = JsonSerializer.Serialize(model);
-            Console.WriteLine($" ---------------- BODY {jsonString} -----------------");
+            _logger.LogInformation($" ---------------- BODY {jsonString} -----------------");
             request.AddJsonBody(jsonString);
 
             return request;
