@@ -313,10 +313,19 @@ namespace SER.Utilitties.NetCore.Services
 
                 result.current_page = pageNumber;
                 result.page_size = pageSize;
-                result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
 
-                var pageCount = (double)result.row_count / pageSize;
-                result.page_count = (int)Math.Ceiling(pageCount);
+                if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("pagination_type")).Value.ToString(), out int paginationType) && paginationType == 1)
+                {
+                    result.row_count = 0;
+                    result.page_count = 0;
+                }
+                else
+                {
+                    result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
+
+                    var pageCount = (double)result.row_count / pageSize;
+                    result.page_count = (int)Math.Ceiling(pageCount);
+                }
 
                 foreach (var param in ParamsPagination)
                     Params.Add(param.Key, param.Value);
@@ -360,10 +369,19 @@ namespace SER.Utilitties.NetCore.Services
 
             result.current_page = pageNumber;
             result.page_size = pageSize;
-            result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
 
-            var pageCount = (double)result.row_count / pageSize;
-            result.page_count = (int)Math.Ceiling(pageCount);
+            if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("pagination_type")).Value.ToString(), out int paginationType) && paginationType == 1)
+            {
+                result.row_count = 0;
+                result.page_count = 0;
+            }
+            else
+            {
+                result.row_count = GetCountDBAsync(query, Params, NpgsqlParams: NpgsqlParams).Result;
+
+                var pageCount = (double)result.row_count / pageSize;
+                result.page_count = (int)Math.Ceiling(pageCount);
+            }
 
             foreach (var param in ParamsPagination)
                 Params.Add(param.Key, param.Value);
