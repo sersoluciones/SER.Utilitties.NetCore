@@ -23,7 +23,8 @@ namespace SER.Utilitties.NetCore.Utilities
         public static string ToCamelCase(this string s1)
         {
             // return Regex.Replace(s1,).ToLower();
-            return Regex.Replace(s1, "_[a-z]", delegate (Match m) {
+            return Regex.Replace(s1, "_[a-z]", delegate (Match m)
+            {
                 return m.ToString().TrimStart('_').ToUpper();
             }).FirstCharToUpper();
         }
@@ -55,7 +56,7 @@ namespace SER.Utilitties.NetCore.Utilities
                                  TimeSpan.FromMilliseconds(100)).ToLowerInvariant();
         }
 
-        public static string GenerateSlug(this string phrase)
+        public static string GenerateSlug(this string phrase, int limit = 0)
         {
             string str = phrase.RemoveAccent().ToLower();
             // invalid chars           
@@ -63,7 +64,7 @@ namespace SER.Utilitties.NetCore.Utilities
             // convert multiple spaces into one space   
             str = Regex.Replace(str, @"\s+", " ").Trim();
             // cut and trim 
-            str = str.Substring(0, str.Length <= 45 ? str.Length : 45).Trim();
+            if (limit > 0) str = str.Substring(0, str.Length <= limit ? str.Length : limit).Trim();
             str = Regex.Replace(str, @"\s", "-"); // hyphens   
             return str;
         }
