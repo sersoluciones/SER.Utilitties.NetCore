@@ -1,11 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using Npgsql;
-using SER.Utilitties.NetCore.MisDatos.Models;
+using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Utilities
 {
@@ -14,7 +12,8 @@ namespace SER.Utilitties.NetCore.Utilities
         public static NpgsqlParameter[] SetSqlParamsPsqlSQL(this NpgsqlCommand command, Dictionary<string, object> Params = null,
            ILogger _logger = null)
         {
-            List<NpgsqlParameter> SqlParameters = new List<NpgsqlParameter>();
+            List<NpgsqlParameter> SqlParameters = new();
+
             if (Params != null)
             {
                 foreach (var pair in Params)
@@ -58,7 +57,12 @@ namespace SER.Utilitties.NetCore.Utilities
                     }
                     else if (pair.Value.GetType() == typeof(Guid))
                     {
-                        SqlParameters.Add(new NpgsqlParameter(pair.Key, (Guid)pair.Value));
+                        var param = new NpgsqlParameter(pair.Key, NpgsqlDbType.Uuid)
+                        {
+                            Value = pair.Value
+                        };
+
+                        SqlParameters.Add(param);
                     }
                     else if (pair.Value.GetType().IsArray)
                     {
