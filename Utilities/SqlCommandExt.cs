@@ -56,6 +56,10 @@ namespace SER.Utilitties.NetCore.Utilities
                     {
                         SqlParameters.Add(new NpgsqlParameter(pair.Key, (DateTime)pair.Value));
                     }
+                    else if (pair.Value.GetType() == typeof(Guid))
+                    {
+                        SqlParameters.Add(new NpgsqlParameter(pair.Key, (Guid)pair.Value));
+                    }
                     else if (pair.Value.GetType().IsArray)
                     {
                         if (pair.Value.GetType() == typeof(string[]))
