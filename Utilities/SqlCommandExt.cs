@@ -73,6 +73,13 @@ namespace SER.Utilitties.NetCore.Utilities
                                 SqlParameters.Add(param);
                             }
                         }
+                        else if (pair.Value.GetType() == typeof(Guid[]))
+                        {
+                            foreach (var param in command.GetArrayParameters((Guid[])pair.Value, pair.Key))
+                            {
+                                SqlParameters.Add(param);
+                            }
+                        }
                         else if (pair.Value.GetType() == typeof(int[]))
                         {
                             foreach (var param in command.GetArrayParameters((int[])pair.Value, pair.Key))
@@ -101,7 +108,21 @@ namespace SER.Utilitties.NetCore.Utilities
             {
                 var paramName = string.Format("@{0}{1}", paramNameRoot, paramNbr++);
                 parameterNames.Add(paramName);
-                parameters.Add(new NpgsqlParameter(paramName, value));
+
+                if (typeof(T) == typeof(Guid))
+                {
+                    var paramGuid = new NpgsqlParameter(paramName, NpgsqlDbType.Uuid)
+                    {
+                        Value = value
+                    };
+
+                    parameters.Add(paramGuid);
+                }
+                else
+                {
+                    parameters.Add(new NpgsqlParameter(paramName, value));
+                }
+
                 //_logger.LogInformation("@{0}={1}", paramName, value);
             }
             cmd.CommandText = cmd.CommandText.Replace("{" + paramNameRoot + "}", string.Join(", ", parameterNames));
@@ -132,7 +153,7 @@ namespace SER.Utilitties.NetCore.Utilities
                 result.Append(data);
             }
 
-           if (!start) result.Append(" ) ");
+            if (!start) result.Append(" ) ");
             return result.ToString();
         }
 
