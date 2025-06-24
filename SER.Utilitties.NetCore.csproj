@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
 		<Company>SER Soluciones</Company>
-		<Version>1.0.25</Version>
+		<Version>1.0.26</Version>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>
 			Utilities for Net 6 to make easier start any project
@@ -11,6 +11,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		
+		<PackageReference Include="Dapper" Version="2.1.66" />
 		
 		<PackageReference Include="Google.Apis.Auth" Version="1.57.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="6.0.0" />

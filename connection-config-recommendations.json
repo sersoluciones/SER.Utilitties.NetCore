@@ -1,0 +1,47 @@
+{
+  "// PRODUCTION OPTIMIZED - High Performance Applications": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=5;MaxPoolSize=50;Connection Idle Lifetime=300;Connection Pruning Interval=10;Command Timeout=120;Connect Timeout=30;Cancellation Timeout=30;Keepalive=30;TCP Keepalive=true;TCP Keepalive Idle=600;TCP Keepalive Interval=30;TCP Keepalive Count=3"
+    }
+  },
+  
+  "// DEVELOPMENT - Lower Resource Usage": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=2;MaxPoolSize=20;Connection Idle Lifetime=180;Connection Pruning Interval=15;Command Timeout=120;Connect Timeout=15;Cancellation Timeout=15;Keepalive=60"
+    }
+  },
+  
+  "// HIGH TRAFFIC - Enterprise Applications": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=10;MaxPoolSize=80;Connection Idle Lifetime=600;Connection Pruning Interval=5;Command Timeout=120;Connect Timeout=30;Cancellation Timeout=30;Keepalive=30;TCP Keepalive=true;TCP Keepalive Idle=300;TCP Keepalive Interval=15;TCP Keepalive Count=5"
+    }
+  },
+
+  "// EXPLANATION": {
+    "MinPoolSize": "Minimum connections always open - reduces initial connection latency",
+    "MaxPoolSize": "Maximum connections in pool - should be 60-80% of database max connections",
+    "Connection_Idle_Lifetime": "Seconds before idle connections are closed (300s = 5min)",
+    "Connection_Pruning_Interval": "How often to check for idle connections to close (10s)",
+    "Command_Timeout": "Maximum time for a command to execute (120s = 2min)",
+    "Connect_Timeout": "Maximum time to establish initial connection (30s)",
+    "Cancellation_Timeout": "Time to wait for command cancellation (30s)",
+    "Keepalive": "Send keepalive packets every N seconds to detect dead connections",
+    "TCP_Keepalive": "Enable TCP-level keepalive for network-level connection monitoring"
+  },
+
+  "// MONITORING RECOMMENDATIONS": {
+    "metrics_to_monitor": [
+      "Npgsql connection pool usage",
+      "Average connection acquisition time",
+      "Number of active vs idle connections",
+      "Connection timeout errors",
+      "Command timeout errors"
+    ],
+    "alerts_to_setup": [
+      "Pool exhaustion (usage > 90%)",
+      "High connection acquisition time (> 1s)",
+      "Frequent connection timeouts",
+      "Stale connection detection"
+    ]
+  }
+}

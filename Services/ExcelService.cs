@@ -92,11 +92,6 @@ namespace SER.Utilitties.NetCore.Services
             return string.Empty;
         }
 
-        private static string ParamsToString(NpgsqlParameter[] dictionary)
-        {
-            return "{" + string.Join(",", dictionary.Select(kv => kv.ParameterName + "=" + kv.Value).ToArray()) + "}";
-        }
-
         public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null)
         {
             string SqlConnectionStr = _optionsDelegate.CurrentValue.ConnectionString;
@@ -113,7 +108,7 @@ namespace SER.Utilitties.NetCore.Services
                     cmd.CommandText = Query;
                     cmd.CommandTimeout = 120;
                     cmd.Parameters.AddRange(cmd.SetSqlParamsPsqlSQL(Params, _logger));
-                    _logger.LogInformation($"Executed DbCommand [Parameters=[{ParamsToString(cmd.Parameters.ToArray())}], " +
+                    _logger.LogInformation($"Executed DbCommand [Parameters=[{PostgresQLService.ParamsToString(cmd.Parameters.ToArray())}], " +
                         $"CommandType={cmd.CommandType}, CommandTimeout='{cmd.CommandTimeout}']\n" +
                         $"      Query\n      {cmd.CommandText}");
                     return int.Parse((await cmd.ExecuteScalarAsync()).ToString());
