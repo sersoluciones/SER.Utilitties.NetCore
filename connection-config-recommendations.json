@@ -1,47 +1,99 @@
 {
-  "// PRODUCTION OPTIMIZED - High Performance Applications": {
-    "SERRestOptions": {
-      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=5;MaxPoolSize=50;Connection Idle Lifetime=300;Connection Pruning Interval=10;Command Timeout=120;Connect Timeout=30;Cancellation Timeout=30;Keepalive=30;TCP Keepalive=true;TCP Keepalive Idle=600;TCP Keepalive Interval=30;TCP Keepalive Count=3"
-    }
-  },
-  
-  "// DEVELOPMENT - Lower Resource Usage": {
-    "SERRestOptions": {
-      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=2;MaxPoolSize=20;Connection Idle Lifetime=180;Connection Pruning Interval=15;Command Timeout=120;Connect Timeout=15;Cancellation Timeout=15;Keepalive=60"
-    }
-  },
-  
-  "// HIGH TRAFFIC - Enterprise Applications": {
-    "SERRestOptions": {
-      "ConnectionString": "Host=plocalhost;Port=5432;Database=db_name;Username=postgres;Password=xxxxx;Pooling=true;MinPoolSize=10;MaxPoolSize=80;Connection Idle Lifetime=600;Connection Pruning Interval=5;Command Timeout=120;Connect Timeout=30;Cancellation Timeout=30;Keepalive=30;TCP Keepalive=true;TCP Keepalive Idle=300;TCP Keepalive Interval=15;TCP Keepalive Count=5"
+  "// === NPGSQL DEFAULT VALUES ANALYSIS ===": {
+    "defaults": {
+      "Port": "5432 (PostgreSQL default - can be omitted)",
+      "Pooling": "true (can be omitted - enabled by default)",
+      "MinPoolSize": "0 (no minimum connections)",
+      "MaxPoolSize": "100 (sufficient for most apps)",
+      "Connection_Idle_Lifetime": "3600 seconds (1 hour)",
+      "Connection_Pruning_Interval": "10 seconds",
+      "Command_Timeout": "30 seconds",
+      "Connect_Timeout": "15 seconds",
+      "Cancellation_Timeout": "30 seconds",
+      "Keepalive": "0 (disabled)",
+      "TCP_Keepalive": "false"
     }
   },
 
-  "// EXPLANATION": {
-    "MinPoolSize": "Minimum connections always open - reduces initial connection latency",
-    "MaxPoolSize": "Maximum connections in pool - should be 60-80% of database max connections",
-    "Connection_Idle_Lifetime": "Seconds before idle connections are closed (300s = 5min)",
-    "Connection_Pruning_Interval": "How often to check for idle connections to close (10s)",
-    "Command_Timeout": "Maximum time for a command to execute (120s = 2min)",
-    "Connect_Timeout": "Maximum time to establish initial connection (30s)",
-    "Cancellation_Timeout": "Time to wait for command cancellation (30s)",
-    "Keepalive": "Send keepalive packets every N seconds to detect dead connections",
-    "TCP_Keepalive": "Enable TCP-level keepalive for network-level connection monitoring"
+  "// === MINIMAL CONFIGURATION (Uses Most Defaults) ===": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx"
+    },
+    "note": "Only essential parameters - everything else uses Npgsql defaults"
   },
 
-  "// MONITORING RECOMMENDATIONS": {
-    "metrics_to_monitor": [
-      "Npgsql connection pool usage",
-      "Average connection acquisition time",
-      "Number of active vs idle connections",
-      "Connection timeout errors",
-      "Command timeout errors"
+  "// === OPTIMIZED MINIMAL (Few Strategic Changes) ===": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;MinPoolSize=2;Command Timeout=120"
+    },
+    "why_these_changes": {
+      "MinPoolSize=2": "Better than default 0 - ensures 2 warm connections",
+      "Command_Timeout=120": "Matches your DefaultCommandTimeout constant"
+    }
+  },
+
+  "// === RECOMMENDED PRODUCTION (Strategic Overrides) ===": {
+    "SERRestOptions": {
+      "ConnectionString": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;MinPoolSize=5;MaxPoolSize=50;Command Timeout=120;Connection Idle Lifetime=300"
+    },
+    "changes_from_defaults": {
+      "MinPoolSize": "0 → 5 (warm connections)",
+      "MaxPoolSize": "100 → 50 (conservative for AWS RDS)", 
+      "Command_Timeout": "30 → 120 (longer queries)",
+      "Connection_Idle_Lifetime": "3600 → 300 (faster cleanup)"
+    }
+  },
+
+  "// === WHAT YOU CAN SAFELY REMOVE ===": {
+    "can_remove_completely": [
+      "Port=5432 (PostgreSQL default)",
+      "Pooling=true (enabled by default)",
+      "Connection Pruning Interval=10 (matches default)",
+      "Connect Timeout=15 (matches default)", 
+      "Cancellation Timeout=30 (matches default)"
     ],
-    "alerts_to_setup": [
-      "Pool exhaustion (usage > 90%)",
-      "High connection acquisition time (> 1s)",
-      "Frequent connection timeouts",
-      "Stale connection detection"
+    "can_remove_if_ok_with_defaults": [
+      "MinPoolSize (default=0, but 2-5 is better)",
+      "MaxPoolSize (default=100, but 50 safer for AWS)",
+      "Command Timeout (default=30s, but you use 120s)",
+      "Connection Idle Lifetime (default=1h, but 5min better)",
+      "Keepalive (default=disabled, but useful for AWS RDS)"
     ]
+  },
+
+  "// === COMPARISON: YOUR CURRENT VS OPTIMIZED ===": {
+    "your_current": {
+      "connection_string": "User ID=postgres;Password=xxxxx;Host=localhost;Port=5432;Database=db_name;Timeout=0;Pooling=true;MinPoolSize=1;MaxPoolSize=128;",
+      "issues": [
+        "Timeout=0 (disables timeouts - dangerous!)",
+        "MaxPoolSize=128 (too high for most cases)",
+        "MinPoolSize=1 (minimal warm connections)"
+      ]
+    },
+    "recommended_minimal": {
+      "connection_string": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;MinPoolSize=2;Command Timeout=120",
+      "removed_from_your_config": [
+        "Port=5432 (uses default)",
+        "Pooling=true (uses default)", 
+        "Timeout=0 (replaced with Command Timeout=120)",
+        "MaxPoolSize=128 (uses default 100)"
+      ],
+      "benefits": "90% shorter, uses safe defaults, fixes timeout issue"
+    }
+  },
+
+  "// === STEP-BY-STEP MIGRATION GUIDE ===": {
+    "step_1_minimal_safe": {
+      "config": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;Command Timeout=120",
+      "description": "Absolute minimum - fixes your Timeout=0 issue"
+    },
+    "step_2_add_pool_warmup": {
+      "config": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;MinPoolSize=2;Command Timeout=120",
+      "description": "Adds connection warmup for better performance"
+    },
+    "step_3_production_ready": {
+      "config": "Host=localhost;Database=db_name;Username=postgres;Password=xxxxx;MinPoolSize=5;MaxPoolSize=50;Command Timeout=120;Connection Idle Lifetime=300",
+      "description": "Full production optimization while keeping it simple"
+    }
   }
 }

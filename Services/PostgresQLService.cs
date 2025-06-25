@@ -22,7 +22,7 @@ using Dapper;
 
 namespace SER.Utilitties.NetCore.Services
 {
-    public class PostgresQLService
+    public class PostgresService : IPostgresQLService
     {
         private readonly ILogger _logger;
         private IConfiguration _config;
@@ -41,14 +41,14 @@ namespace SER.Utilitties.NetCore.Services
         private const int DefaultCommandTimeout = 120;
         private const int DefaultPageSize = 20;
 
-        public PostgresQLService(
-            ILogger<PostgresQLService> logger,
+        public PostgresService(
+            ILoggerFactory loggerFactory,
             IHttpContextAccessor httpContextAccessor,
             IMemoryCache memoryCache,
             IOptionsMonitor<SERRestOptions> optionsDelegate,
             IConfiguration config)
         {
-            _logger = logger;
+            _logger = loggerFactory.CreateLogger("PostgresQLService");
             _config = config;
             _contextAccessor = httpContextAccessor;
             _cache = memoryCache;
@@ -69,13 +69,13 @@ namespace SER.Utilitties.NetCore.Services
         {
             cmd.CommandText = query;
             cmd.CommandTimeout = DefaultCommandTimeout;
-            
+
             if (parameters != null)
                 cmd.Parameters.AddRange(cmd.SetSqlParamsPsqlSQL(parameters, _logger));
-            
+
             if (npgsqlParams != null && npgsqlParams.Count > 0)
                 cmd.Parameters.AddRange(npgsqlParams.ToArray());
-            
+
             LogCommandExecution(cmd);
         }
 
@@ -103,26 +103,26 @@ namespace SER.Utilitties.NetCore.Services
         /// <summary>
         /// Helper method to execute database operations with standardized error handling and timing
         /// </summary>
-        private async Task<T> ExecuteWithTimingAsync<T>(string connectionString, string query, 
-            Dictionary<string, object> parameters, List<NpgsqlParameter> npgsqlParams, 
+        private async Task<T> ExecuteWithTimingAsync<T>(string connectionString, string query,
+            Dictionary<string, object> parameters, List<NpgsqlParameter> npgsqlParams,
             Func<NpgsqlCommand, Task<T>> operation, string operationName = "Database Operation")
         {
             var stopwatch = Stopwatch.StartNew();
-            
+
             await using var connection = new NpgsqlConnection(connectionString);
             try
             {
                 await connection.OpenAsync();
                 stopwatch.Start();
-                
+
                 using var cmd = connection.CreateCommand();
                 ConfigureCommand(cmd, query, parameters, npgsqlParams);
-                
+
                 return await operation(cmd);
             }
             catch (Exception ex)
             {
-                _logger.LogCritical("Error in {OperationName}: {Message} {StackTrace} {Data}\n{InnerException}", 
+                _logger.LogCritical("Error in {OperationName}: {Message} {StackTrace} {Data}\n{InnerException}",
                     operationName, ex.Message, ex.StackTrace, ex.Data, ex.InnerException);
                 throw;
             }
@@ -482,7 +482,7 @@ namespace SER.Utilitties.NetCore.Services
             StringBuilder st = new StringBuilder();
             var ParamsPagination = new Dictionary<string, object>();
             int count = Params == null ? 0 : Params.Count;
-            
+
             int pageSize = take == 0 ? DefaultPageSize : take;
             int pageNumber = page == 0 ? 1 : page;
 
@@ -532,7 +532,7 @@ namespace SER.Utilitties.NetCore.Services
             StringBuilder st = new StringBuilder();
             var ParamsPagination = new Dictionary<string, object>();
             int count = Params == null ? 0 : Params.Count;
-            
+
             int pageSize = take == 0 ? DefaultPageSize : take;
             int pageNumber = page == 0 ? 1 : page;
 
@@ -580,11 +580,11 @@ namespace SER.Utilitties.NetCore.Services
         public async Task<int> GetCountDBAsync(string query, Dictionary<string, object> Params = null, List<NpgsqlParameter> NpgsqlParams = null)
         {
             string countQuery = @"SELECT COUNT(*) FROM ( " + query + " ) as p";
-            
+
             return await ExecuteWithTimingAsync(
-                GetConnectionString(), 
-                countQuery, 
-                Params, 
+                GetConnectionString(),
+                countQuery,
+                Params,
                 NpgsqlParams,
                 async cmd => int.Parse((await cmd.ExecuteScalarAsync()).ToString()),
                 "GetCountDBAsync"
@@ -790,6 +790,8 @@ namespace SER.Utilitties.NetCore.Services
             }
             return response;
         }
+
+
         public async Task<dynamic> GetDataFromDBAsync<E>(string query, Dictionary<string, object> Params = null, List<NpgsqlParameter> NpgsqlParams = null,
            string OrderBy = "", string GroupBy = "", bool commit = false, bool jObject = false, bool json = true,
            bool serialize = false, string connection = null, string prefix = null, string whereArgs = null)
@@ -1085,261 +1087,7 @@ namespace SER.Utilitties.NetCore.Services
             return response;
         }
 
-        #region Dapper Methods - Modern Simplified Alternatives
 
-        /// <summary>
-        /// Execute a query and return dynamic results using Dapper
-        /// 🚀 MUCH simpler than GetDataFromDBAsync - reduces 50+ lines to 1 line
-        /// Perfect for quick queries where you don't need strong typing
-        /// </summary>
-        public async Task<IEnumerable<dynamic>> GetDataWithDapper(string query, object parameters = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            var stopwatch = Stopwatch.StartNew();
-            
-            try
-            {
-                _logger.LogInformation($"Executing Dapper query: {query}");
-                if (parameters != null)
-                    _logger.LogInformation($"Parameters: {JsonSerializer.Serialize(parameters)}");
-                
-                return await connection.QueryAsync(query, parameters);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical("Dapper Error {0} {1}", ex.Message, ex.StackTrace);
-                throw;
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug($"Dapper Query Time: {stopwatch.Elapsed} ({stopwatch.Elapsed.Milliseconds}ms)");
-            }
-        }
-
-        /// <summary>
-        /// Execute a query and return strongly typed results using Dapper
-        /// 🎯 Automatic object mapping - no more manual reflection!
-        /// Replaces the complex generic GetDataFromDBAsync for simple cases
-        /// </summary>
-        public async Task<IEnumerable<T>> GetDataWithDapper<T>(string query, object parameters = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            var stopwatch = Stopwatch.StartNew();
-            
-            try
-            {
-                _logger.LogInformation($"Executing Dapper query for {typeof(T).Name}: {query}");
-                if (parameters != null)
-                    _logger.LogInformation($"Parameters: {JsonSerializer.Serialize(parameters)}");
-                
-                return await connection.QueryAsync<T>(query, parameters);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical("Dapper Error {0} {1}", ex.Message, ex.StackTrace);
-                throw;
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug($"Dapper Query Time: {stopwatch.Elapsed} ({stopwatch.Elapsed.Milliseconds}ms)");
-            }
-        }
-
-        /// <summary>
-        /// Execute a query and return a single result using Dapper
-        /// 📄 Perfect for single-record queries - much simpler than current implementation
-        /// </summary>
-        public async Task<T> GetSingleWithDapper<T>(string query, object parameters = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            var stopwatch = Stopwatch.StartNew();
-            
-            try
-            {
-                _logger.LogInformation($"Executing Dapper single query for {typeof(T).Name}: {query}");
-                if (parameters != null)
-                    _logger.LogInformation($"Parameters: {JsonSerializer.Serialize(parameters)}");
-                
-                return await connection.QueryFirstOrDefaultAsync<T>(query, parameters);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical("Dapper Error {0} {1}", ex.Message, ex.StackTrace);
-                throw;
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug($"Dapper Query Time: {stopwatch.Elapsed} ({stopwatch.Elapsed.Milliseconds}ms)");
-            }
-        }
-
-        /// <summary>
-        /// Execute non-query commands (INSERT, UPDATE, DELETE) using Dapper
-        /// ⚡ Returns number of affected rows - much cleaner than current commit=true approach
-        /// </summary>
-        public async Task<int> ExecuteWithDapper(string query, object parameters = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            var stopwatch = Stopwatch.StartNew();
-            
-            try
-            {
-                _logger.LogInformation($"Executing Dapper command: {query}");
-                if (parameters != null)
-                    _logger.LogInformation($"Parameters: {JsonSerializer.Serialize(parameters)}");
-                
-                return await connection.ExecuteAsync(query, parameters);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical("Dapper Error {0} {1}", ex.Message, ex.StackTrace);
-                throw;
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug($"Dapper Command Time: {stopwatch.Elapsed} ({stopwatch.Elapsed.Milliseconds}ms)");
-            }
-        }
-
-        /// <summary>
-        /// Execute scalar queries using Dapper (COUNT, SUM, MAX, etc.)
-        /// 🔢 Much simpler than GetCountDBAsync for custom scalar queries
-        /// </summary>
-        public async Task<T> GetScalarWithDapper<T>(string query, object parameters = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            var stopwatch = Stopwatch.StartNew();
-            
-            try
-            {
-                _logger.LogInformation($"Executing Dapper scalar query: {query}");
-                if (parameters != null)
-                    _logger.LogInformation($"Parameters: {JsonSerializer.Serialize(parameters)}");
-                
-                return await connection.ExecuteScalarAsync<T>(query, parameters);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical("Dapper Error {0} {1}", ex.Message, ex.StackTrace);
-                throw;
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug($"Dapper Scalar Time: {stopwatch.Elapsed} ({stopwatch.Elapsed.Milliseconds}ms)");
-            }
-        }
-
-        /// <summary>
-        /// Dapper version of GetCountDBAsync - much simpler implementation
-        /// </summary>
-        public async Task<int> GetCountWithDapper(string query, object parameters = null)
-        {
-            string countQuery = @"SELECT COUNT(*) FROM ( " + query + " ) as p";
-            return await GetScalarWithDapper<int>(countQuery, parameters);
-        }
-
-        #endregion
-
-        #region Advanced Helper Methods - Further Optimization
-
-        /// <summary>
-        /// Optimized version of GetCountDBAsync using Dapper for better performance
-        /// 🚀 Uses Dapper internally for maximum efficiency
-        /// </summary>
-        public async Task<int> GetCountDBAsyncOptimized(string query, object parameters = null)
-        {
-            string countQuery = @"SELECT COUNT(*) FROM ( " + query + " ) as p";
-            return await GetScalarWithDapper<int>(countQuery, parameters);
-        }
-
-        /// <summary>
-        /// Simplified method for common pagination scenarios
-        /// Combines query execution and count in a single efficient operation
-        /// </summary>
-        public async Task<(IEnumerable<T> Results, int TotalCount)> GetPagedResultsAsync<T>(
-            string query, object parameters = null, int page = 1, int pageSize = 20)
-        {
-            // Execute count and data queries in parallel for better performance
-            var countTask = GetCountDBAsyncOptimized(query, parameters);
-            
-            var offset = (page - 1) * pageSize;
-            var pagedQuery = $"{query} LIMIT @PageSize OFFSET @Offset";
-            
-            var queryParams = parameters != null ? 
-                new Dictionary<string, object>(parameters.GetType().GetProperties()
-                    .ToDictionary(p => p.Name, p => p.GetValue(parameters))) :
-                new Dictionary<string, object>();
-            
-            queryParams["PageSize"] = pageSize;
-            queryParams["Offset"] = offset;
-            
-            var dataTask = GetDataWithDapper<T>(pagedQuery, queryParams);
-            
-            await Task.WhenAll(countTask, dataTask);
-            
-            return (await dataTask, await countTask);
-        }
-
-        /// <summary>
-        /// Execute multiple queries in a single transaction for better performance
-        /// Useful for complex operations that require atomicity
-        /// </summary>
-        public async Task<List<T>> ExecuteTransactionAsync<T>(
-            List<(string Query, object Parameters)> operations, 
-            Func<List<IEnumerable<dynamic>>, List<T>> resultProcessor = null)
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            await connection.OpenAsync();
-            
-            using var transaction = await connection.BeginTransactionAsync();
-            var results = new List<IEnumerable<dynamic>>();
-            
-            try
-            {
-                foreach (var (query, parameters) in operations)
-                {
-                    var result = await connection.QueryAsync(query, parameters, transaction);
-                    results.Add(result);
-                }
-                
-                await transaction.CommitAsync();
-                
-                return resultProcessor != null ? resultProcessor(results) : new List<T>();
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Bulk insert operation optimized for large datasets
-        /// Much faster than individual inserts for large data volumes
-        /// </summary>
-        public async Task<int> BulkInsertAsync<T>(string tableName, IEnumerable<T> entities) where T : class
-        {
-            using var connection = new NpgsqlConnection(GetConnectionString());
-            await connection.OpenAsync();
-            
-            var properties = typeof(T).GetProperties()
-                .Where(p => !p.GetCustomAttributes(typeof(NotMappedAttribute), false).Any())
-                .ToArray();
-            
-            var columns = string.Join(", ", properties.Select(p => p.Name.ToSnakeCase()));
-            var parameters = string.Join(", ", properties.Select((p, i) => $"@{p.Name}"));
-            
-            var query = $"INSERT INTO {tableName} ({columns}) VALUES ({parameters})";
-            
-            return await connection.ExecuteAsync(query, entities);
-        }
-
-        #endregion
     }
 
 }
