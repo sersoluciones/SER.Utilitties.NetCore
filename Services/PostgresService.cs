@@ -786,6 +786,7 @@ namespace SER.Utilitties.NetCore.Services
                 }
 
                 Task<string> dataTask = null;
+                query = SqlCommandExt.ReplaceInbyAny(query);
 
                 if (json)
                 {
