@@ -19,6 +19,7 @@ using Microsoft.Extensions.Options;
 using SER.Utilitties.NetCore.Configuration;
 using System.Collections;
 using Dapper;
+using System.Data;
 
 namespace SER.Utilitties.NetCore.Services
 {
@@ -643,7 +644,34 @@ namespace SER.Utilitties.NetCore.Services
                 {
                     foreach (var param in Params)
                     {
-                        parameters.Add(param.Key, param.Value);
+                        // Manejo especial para arrays
+                        if (param.Value != null &&
+                           (param.Value.GetType().IsArray ||
+                           (param.Value is IEnumerable && !(param.Value is string))))
+                        {
+                            // Asegurar que el nombre del parámetro no tenga formato especial incompatible
+                            string paramName = param.Key;
+                            if (paramName.StartsWith("{") && paramName.EndsWith("}"))
+                            {
+                                // Extraer nombre sin llaves
+                                paramName = paramName.Substring(1, paramName.Length - 2);
+
+                                // Si no tiene @, aseguramos que lo tenga
+                                if (!paramName.StartsWith("@"))
+                                    paramName = "@" + paramName;
+                            }
+                            else if (!paramName.StartsWith("@"))
+                            {
+                                paramName = "@" + paramName;
+                            }
+
+                            // Agregar con tipo DbType.Object para asegurar que PostgreSQL lo trate como array
+                            parameters.Add(paramName, param.Value, DbType.Object);
+                        }
+                        else
+                        {
+                            parameters.Add(param.Key, param.Value);
+                        }
                     }
                 }
 
@@ -651,8 +679,21 @@ namespace SER.Utilitties.NetCore.Services
                 // se ejecuta el commit de una transaccion
                 if (commit)
                 {
-                    _logger.LogInformation($"Executing Dapper query: {query}");
-                    await conn.ExecuteAsync(query, parameters);
+                    // _logger.LogInformation($"Executing Dapper query: {query}");
+                    if (!_optionsDelegate.CurrentValue.DebugMode)
+                    {
+                        await conn.ExecuteAsync(query, parameters);
+                    }
+                    else
+                    {
+                        await conn.ExecuteWithLoggingAsync<string>(
+                            query,
+                            parameters,
+                            commandTimeout: DefaultCommandTimeout,
+                            logger: _logger,
+                            resolveParameters: false
+                        );
+                    }
                     return null;
                 }
 
@@ -711,8 +752,17 @@ namespace SER.Utilitties.NetCore.Services
                     pageResult = new PagedResultBase();
                     pagination = true;
 
-                    // Execute count and data queries in parallel for better performance
-                    countTask = GetCountWithDapper(queryCount ?? query, parameters);
+                    // cuando pagination_type = 1 no se ejecuta el count
+                    if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("pagination_type")).Value.ToString(), out int paginationType) && paginationType == 1)
+                    {
+                        countTask = null;
+                    }
+                    else
+                    {
+                        // Execute count and data queries in parallel for better performance
+                        countTask = GetCountWithDapper(queryCount ?? query, parameters);
+                    }
+
                     var pageRequest = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("page")).Value;
                     int page = !string.IsNullOrEmpty(pageStr) ?
                         int.Parse(pageStr) :
@@ -744,24 +794,46 @@ namespace SER.Utilitties.NetCore.Services
                     else
                         query = string.Format(@"SELECT COALESCE(array_to_json(array_agg(row_to_json(t))), '[]') FROM ({0}) t", query);
 
-                    _logger.LogInformation($"Executing Dapper query: {query}");
+                    // _logger.LogInformation($"Executing Dapper query: {query}");
 
                     if (pagination)
                     {
-                        dataTask = conn.ExecuteScalarAsync<string>(query, parameters);
+                        dataTask = !_optionsDelegate.CurrentValue.DebugMode ?
+                            conn.ExecuteScalarAsync<string>(query, parameters) :
+                            conn.ExecuteScalarWithLoggingAsync<string>(
+                                query,
+                                parameters,
+                                commandTimeout: DefaultCommandTimeout,
+                                logger: _logger,
+                                resolveParameters: false
+                            );
                     }
                     else
                     {
-                        jsonResult = await conn.ExecuteScalarAsync<string>(query, parameters);
+                        jsonResult = !_optionsDelegate.CurrentValue.DebugMode ?
+                            await conn.ExecuteScalarAsync<string>(query, parameters) :
+                            await conn.ExecuteScalarWithLoggingAsync<string>(
+                                query,
+                                parameters,
+                                commandTimeout: DefaultCommandTimeout,
+                                logger: _logger,
+                                resolveParameters: false
+                            );
+
                         jsonResult ??= jObject ? string.Empty : "[]";
                     }
                 }
                 else
                 {
-                    _logger.LogInformation($"Executing Dapper query: {query}");
+                    // _logger.LogInformation($"Executing Dapper query: {query}");
 
                     // Obtener los datos como dynamic para tener acceso a todos los campos
-                    var results = await conn.QueryAsync(query, parameters);
+                    var results = !_optionsDelegate.CurrentValue.DebugMode ?
+                        await conn.QueryAsync(query, parameters) :
+                        await conn.QueryWithLoggingAsync<string>(query, parameters,
+                            commandTimeout: DefaultCommandTimeout,
+                            logger: _logger,
+                            resolveParameters: false);
 
                     // Construir JSON manualmente para mejor control
                     if (!pagination) jsonResult = BuildJsonFromDynamicResults(results, jObject);
@@ -769,17 +841,28 @@ namespace SER.Utilitties.NetCore.Services
 
                 if (pagination && dataTask != null)
                 {
-                    await Task.WhenAll(countTask, dataTask);
+                    var results = "";
+                    if (countTask == null)
+                    {
+                        results = await dataTask;
+                        pageResult.row_count = 0;
+                        pageResult.page_count = 0;
+                    }
+                    else
+                    {
+                        await Task.WhenAll(countTask, dataTask);
 
-                    var res = (await dataTask, await countTask);
+                        var res = (await dataTask, await countTask);
 
-                    pageResult.row_count = res.Item2;
-                    pageResult.page_count = (int)Math.Ceiling((double)pageResult.row_count / pageResult.page_size);
+                        pageResult.row_count = res.Item2;
+                        pageResult.page_count = (int)Math.Ceiling((double)pageResult.row_count / pageResult.page_size);
+                        results = res.Item1;
+                    }
 
                     sb.Append(JsonSerializer.Serialize(pageResult));
                     sb.Replace("}", ",", sb.Length - 2, 2);
                     sb.Append("\n\"results\": ");
-                    sb.Append(res.Item1 ?? "[]");
+                    sb.Append(results ?? "[]");
                     sb.Append('}');
 
                     jsonResult = sb.ToString();

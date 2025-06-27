@@ -4,6 +4,7 @@ using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SER.Utilitties.NetCore.Utilities
 {
@@ -130,12 +131,44 @@ namespace SER.Utilitties.NetCore.Utilities
             return parameters.ToArray();
         }
 
-        public static string MakeParamsQuery(List<string> contentValues, bool start = false)
+        public static string ReplaceInbyAny(string input)
         {
-            StringBuilder result = new StringBuilder();
+            // Busca patrones como: campo IN ({param})
+            // Soporta: campo IN ({param}) y campo NOT IN ({param}), con o sin espacios
+            var pattern = @"\b(\w+(?:\.\w+)?)\s+(NOT\s+)?IN\s*\(\s*\{\s*(\w+)\s*\}\s*\)";
+
+            return Regex.Replace(input, pattern, m =>
+            {
+                string campo = m.Groups[1].Value;
+                bool esNotIn = !string.IsNullOrWhiteSpace(m.Groups[2].Value);
+                string variable = m.Groups[3].Value;
+
+                if (esNotIn)
+                    return $"{campo} != ALL(@{variable})";
+                else
+                    return $"{campo} = ANY(@{variable})";
+            }, RegexOptions.IgnoreCase);
+        }
+
+
+        public static string MakeParamsQuery(List<string> contentValues, bool start = false, string @operator = "AND")
+        {
+            if (contentValues == null || contentValues.Count == 0)
+                return string.Empty;
+
+            // Si el operador es OR, lo convertimos a mayúsculas
+            @operator = @operator?.Trim().ToUpper() == "OR" ? "OR" : "AND";
+
+            // Si el operador es AND, lo dejamos como está
+            if (@operator != "AND" && @operator != "OR")
+                throw new ArgumentException("El operador debe ser 'AND' o 'OR'.");
+
+            StringBuilder result = new();
             bool first = true;
             foreach (string data in contentValues)
             {
+                var value = ReplaceInbyAny(data);
+                // Console.WriteLine($" ================== Orginal: {data} Value: {value}");
                 if (!start)
                 {
                     if (first)
@@ -144,18 +177,62 @@ namespace SER.Utilitties.NetCore.Utilities
                         first = false;
                     }
                     else
-                        result.Append(" AND ");
+                        result.Append($" {@operator} ");
                 }
                 else
                 {
-                    result.Append(" AND ");
+                    result.Append($" {@operator} ");
                 }
-                result.Append(data);
+                result.Append(value);
             }
 
             if (!start) result.Append(" ) ");
             return result.ToString();
         }
 
+        public static string MakeParamsQuery(List<ParamCondition> conditions, bool start = false)
+        {
+            if (conditions == null || conditions.Count == 0)
+                return string.Empty;
+
+            StringBuilder result = new StringBuilder();
+            bool first = true;
+
+            foreach (var cond in conditions)
+            {
+                var value = ReplaceInbyAny(cond.Expression);
+                var op = cond.Operator?.Trim().ToUpper() == "OR" ? "OR" : "AND";
+
+                if (!start)
+                {
+                    if (first)
+                    {
+                        result.Append(" WHERE ( ");
+                        result.Append(value);
+                        first = false;
+                    }
+                    else
+                    {
+                        result.Append($" {op} ");
+                        result.Append(value);
+                    }
+                }
+                else
+                {
+                    result.Append($" {op} ");
+                    result.Append(value);
+                }
+            }
+
+            if (!start) result.Append(" ) ");
+            return result.ToString();
+        }
+
+    }
+
+    public class ParamCondition
+    {
+        public string Expression { get; set; }  // Ej: "c.id in {{categorias}}"
+        public string Operator { get; set; }    // "AND" o "OR"
     }
 }
