@@ -828,12 +828,7 @@ namespace SER.Utilitties.NetCore.Services
                     // _logger.LogInformation($"Executing Dapper query: {query}");
 
                     // Obtener los datos como dynamic para tener acceso a todos los campos
-                    var results = !_optionsDelegate.CurrentValue.DebugMode ?
-                        await conn.QueryAsync(query, parameters) :
-                        await conn.QueryWithLoggingAsync<string>(query, parameters,
-                            commandTimeout: DefaultCommandTimeout,
-                            logger: _logger,
-                            resolveParameters: false);
+                    var results = await conn.QueryAsync(query, parameters);
 
                     // Construir JSON manualmente para mejor control
                     if (!pagination) jsonResult = BuildJsonFromDynamicResults(results, jObject);
