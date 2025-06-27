@@ -825,7 +825,7 @@ namespace SER.Utilitties.NetCore.Services
                 }
                 else
                 {
-                    // _logger.LogInformation($"Executing Dapper query: {query}");
+                    if (_optionsDelegate.CurrentValue.DebugMode) _logger.LogInformation("Executing Dapper query: {query}", query);
 
                     // Obtener los datos como dynamic para tener acceso a todos los campos
                     var results = await conn.QueryAsync(query, parameters);
