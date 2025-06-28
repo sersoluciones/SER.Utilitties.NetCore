@@ -670,6 +670,10 @@ namespace SER.Utilitties.NetCore.Services
                         }
                         else
                         {
+                            if (_optionsDelegate.CurrentValue.DebugMode)
+                            {
+                                _logger.LogDebug("Adding parameter: {Key} = {Value}", param.Key, param.Value);
+                            }
                             parameters.Add(param.Key, param.Value);
                         }
                     }
@@ -826,10 +830,18 @@ namespace SER.Utilitties.NetCore.Services
                 }
                 else
                 {
-                    if (_optionsDelegate.CurrentValue.DebugMode) _logger.LogInformation("Executing Dapper query: {query}", query);
+                    // if (_optionsDelegate.CurrentValue.DebugMode) _logger.LogInformation("Executing Dapper query: {query}", query);
 
                     // Obtener los datos como dynamic para tener acceso a todos los campos
-                    var results = await conn.QueryAsync(query, parameters);
+                    var results = !_optionsDelegate.CurrentValue.DebugMode ?
+                        await conn.QueryAsync(query, parameters):
+                        await conn.QueryWithLoggingAsync(
+                            query,
+                            parameters,
+                            commandTimeout: DefaultCommandTimeout,
+                            logger: _logger,
+                            resolveParameters: false
+                        );
 
                     // Construir JSON manualmente para mejor control
                     if (!pagination) jsonResult = BuildJsonFromDynamicResults(results, jObject);

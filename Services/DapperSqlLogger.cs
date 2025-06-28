@@ -452,7 +452,7 @@ namespace SER.Utilitties.NetCore.Services
         /// <summary>
         /// Ejecuta múltiples consultas con logging detallado
         /// </summary>
-        public static async Task<IEnumerable<T>> QueryWithLoggingAsync<T>(
+        public static async Task<IEnumerable<dynamic>> QueryWithLoggingAsync(
             this IDbConnection connection,
             string sql,
             object param = null,
@@ -464,27 +464,27 @@ namespace SER.Utilitties.NetCore.Services
             bool resolveParameters = true)
         {
             // Obtenemos el comando subyacente
-            var logCommand = connection.CreateCommand() as DbCommand;
-            logCommand.CommandText = sql;
-            logCommand.CommandType = commandType ?? CommandType.Text;
+            var command = connection.CreateCommand() as DbCommand;
+            command.CommandText = sql;
+            command.CommandType = commandType ?? CommandType.Text;
 
             if (commandTimeout.HasValue)
-                logCommand.CommandTimeout = commandTimeout.Value;
+                command.CommandTimeout = commandTimeout.Value;
 
             if (transaction != null)
-                logCommand.Transaction = transaction as DbTransaction;
+                command.Transaction = transaction as DbTransaction;
 
             // Añadir parámetros si existen
             if (param != null)
             {
-                AddParametersToCommand(logCommand, param);
+                AddParametersToCommand(command, param);
             }
 
             // Crear el logger solo si se proporcionó uno
-            using var sqlLogger = logger != null ? new DapperSqlLogger(logCommand, logger, operationName, resolveParameters) : null;
+            using var sqlLogger = logger != null ? new DapperSqlLogger(command, logger, operationName, resolveParameters) : null;
 
             // Ejecutar la consulta original
-            return await connection.QueryAsync<T>(sql, param, transaction, commandTimeout, commandType);
+            return await connection.QueryAsync(sql, param, transaction, commandTimeout, commandType);
         }
 
         /// <summary>
