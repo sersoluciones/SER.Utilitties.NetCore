@@ -709,8 +709,16 @@ namespace SER.Utilitties.NetCore.Services
 
                 var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix ?? currentClass.ToLower().First().ToString());
 
-                if (!string.IsNullOrEmpty(clauseWhere) && !skipClauseWhere) query = string.Format("{0}\nWHERE {1}", query, clauseWhere);
-                else if (!string.IsNullOrEmpty(clauseWhere) && skipClauseWhere) query = string.Format("{0}\nAND {1}", query, clauseWhere);
+                if (!Params.Any())
+                {
+                    if (!string.IsNullOrEmpty(clauseWhere) && !skipClauseWhere) query = string.Format("{0}\nWHERE {1}", query, clauseWhere);
+                    else if (!string.IsNullOrEmpty(clauseWhere) && skipClauseWhere) query = string.Format("{0}\nAND {1}", query, clauseWhere);
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(clauseWhere)) query = string.Format("{0}\nAND {1}", query, clauseWhere);
+                }
+
 
                 foreach (var param in ParamsRequest)
                 {
@@ -834,7 +842,7 @@ namespace SER.Utilitties.NetCore.Services
 
                     // Obtener los datos como dynamic para tener acceso a todos los campos
                     var results = !_optionsDelegate.CurrentValue.DebugMode ?
-                        await conn.QueryAsync(query, parameters):
+                        await conn.QueryAsync(query, parameters) :
                         await conn.QueryWithLoggingAsync(
                             query,
                             parameters,
