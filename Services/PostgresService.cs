@@ -600,7 +600,7 @@ namespace SER.Utilitties.NetCore.Services
         {
             return await GetDataFromDBAsync<object>(query, Params: Params, // NpgsqlParams: NpgsqlParams,
                 OrderBy: OrderBy, GroupBy: GroupBy, commit: commit, jObject: jObject, json: json, connection: connection,
-                takeStr: take, pageStr: page, queryCount: queryCount);
+                takeStr: take, pageStr: page, queryCount: queryCount, allowQueryCollection: false);
         }
 
         /// Executes a SQL query asynchronously against a PostgreSQL database and returns the result in various formats.
@@ -618,15 +618,16 @@ namespace SER.Utilitties.NetCore.Services
         /// <param name="connection">Optional connection string to use; if null, uses the default connection.</param>
         /// <param name="prefix">Optional prefix for query customization.</param>
         /// <param name="whereArgs">Optional WHERE clause arguments for query customization.</param>
+        /// <param name="locationClauseWhere"> 0 -> antes del group by, 1 -> despues del group by , 2 -> despues del order by. Default 0</param>
         /// <returns>
         /// A task representing the asynchronous operation. The result is either a JSON string or a dynamic object,
         /// depending on the <paramref name="json"/> parameter.
         /// </returns>
         /// <exception cref="Exception">Throws if there is an error executing the query.</exception>
         public async Task<dynamic> GetDataFromDBAsync<E>(string query, Dictionary<string, object> Params = null,
-            string OrderBy = "", string GroupBy = "", bool commit = false,
+            string OrderBy = "", string GroupBy = "", bool commit = false, bool allowQueryCollection = true,
             bool jObject = false, bool json = true, string connection = null, string prefix = null,
-            string? pageStr = null, string? takeStr = null, string? queryCount = null, bool skipClauseWhere = false) where E : class
+            string? pageStr = null, string? takeStr = null, string? queryCount = null, bool skipClauseWhere = false, int locationClauseWhere = 0) where E : class
         {
             using var conn = new NpgsqlConnection(connection ?? GetConnectionString());
             var stopwatch = Stopwatch.StartNew();
@@ -708,22 +709,17 @@ namespace SER.Utilitties.NetCore.Services
                     currentClass = "role";
 
                 var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix ?? currentClass.ToLower().First().ToString());
-
-                if (!Params.Any())
-                {
-                    if (!string.IsNullOrEmpty(clauseWhere) && !skipClauseWhere) query = string.Format("{0}\nWHERE {1}", query, clauseWhere);
-                    else if (!string.IsNullOrEmpty(clauseWhere) && skipClauseWhere) query = string.Format("{0}\nAND {1}", query, clauseWhere);
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(clauseWhere)) query = string.Format("{0}\nAND {1}", query, clauseWhere);
-                }
-
-
                 foreach (var param in ParamsRequest)
                 {
                     parameters.Add(param.Key, param.Value);
                 }
+
+                // se ubica el WHERE en la consulta antes del group by
+                if (locationClauseWhere == 0)
+                {
+                    query = GetQueryWithWhere(query, clauseWhere, Params, skipClauseWhere: skipClauseWhere);
+                }
+
 
                 var jsonResult = string.Empty;
 
@@ -733,8 +729,14 @@ namespace SER.Utilitties.NetCore.Services
                     query = string.Format("{0}\nGROUP BY {1}", query, GroupBy);
                 }
 
+                // se ubica el WHERE en la consulta despues del group by
+                if (locationClauseWhere == 1)
+                {
+                    query = GetQueryWithWhere(query, clauseWhere, Params, skipClauseWhere: skipClauseWhere);
+                }
+
                 // Order By
-                if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("order_by")))
+                if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("order_by")) && allowQueryCollection)
                 {
                     OrderBy = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("order_by")).Value.ToString();
                     //var initialClass = currentClass.ToLower().First();
@@ -755,17 +757,23 @@ namespace SER.Utilitties.NetCore.Services
                     query = string.Format("{0}\nORDER BY {1}", query, OrderBy);
                 }
 
+                // se ubica el WHERE en la consulta despues del order by
+                if (locationClauseWhere == 2)
+                {
+                    query = GetQueryWithWhere(query, clauseWhere, Params, skipClauseWhere: skipClauseWhere);
+                }
+
                 bool pagination = false;
                 Task<int> countTask = null;
                 // Pagination
-                if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("page")))
+                if ((_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("page")) && allowQueryCollection) || !string.IsNullOrEmpty(pageStr))
                 {
                     // parameters ??= new Dictionary<string, object>();
                     pageResult = new PagedResultBase();
                     pagination = true;
 
                     // cuando pagination_type = 1 no se ejecuta el count
-                    if (int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("pagination_type")).Value.ToString(), out int paginationType) && paginationType == 1)
+                    if (allowQueryCollection && int.TryParse(_contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("pagination_type")).Value.ToString(), out int paginationType) && paginationType == 1)
                     {
                         countTask = null;
                     }
@@ -775,13 +783,13 @@ namespace SER.Utilitties.NetCore.Services
                         countTask = GetCountWithDapper(queryCount ?? query, parameters);
                     }
 
-                    var pageRequest = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("page")).Value;
+                    var pageRequest = allowQueryCollection ? _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("page")).Value.ToString() : null;
                     int page = !string.IsNullOrEmpty(pageStr) ?
                         int.Parse(pageStr) :
                         string.IsNullOrEmpty(pageRequest) ? 1 : int.Parse(pageRequest);
 
                     // Pagination
-                    var pageSizeRequest = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("take")).Value;
+                    var pageSizeRequest = allowQueryCollection ? _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("take")).Value.ToString() : null;
                     int pageSize = !string.IsNullOrEmpty(takeStr) ?
                         int.Parse(takeStr) :
                         string.IsNullOrEmpty(pageSizeRequest) ? DefaultPageSize : int.Parse(pageSizeRequest);
@@ -795,6 +803,12 @@ namespace SER.Utilitties.NetCore.Services
                     pageResult.current_page = page;
                     pageResult.page_size = pageSize;
 
+                }
+
+                 // se ubica el WHERE en la consulta despues de pagination
+                if (locationClauseWhere == 3)
+                {
+                    query = GetQueryWithWhere(query, clauseWhere, Params, skipClauseWhere: skipClauseWhere);
                 }
 
                 Task<string> dataTask = null;
@@ -903,6 +917,20 @@ namespace SER.Utilitties.NetCore.Services
 
 
         #region Helper Methods - Additional Utilities
+
+        private static string GetQueryWithWhere(string query, string clauseWhere, Dictionary<string, object> Params, bool skipClauseWhere = false)
+        {
+            if (!Params.Any())
+            {
+                if (!string.IsNullOrEmpty(clauseWhere) && !skipClauseWhere) query = string.Format("{0}\nWHERE {1}", query, clauseWhere);
+                else if (!string.IsNullOrEmpty(clauseWhere) && skipClauseWhere) query = string.Format("{0}\nAND {1}", query, clauseWhere);
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(clauseWhere)) query = string.Format("{0}\nAND {1}", query, clauseWhere);
+            }
+            return query;
+        }
 
         private string BuildJsonFromDynamicResults(IEnumerable<dynamic> results, bool jObject = false)
         {
