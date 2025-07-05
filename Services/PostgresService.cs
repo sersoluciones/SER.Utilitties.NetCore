@@ -617,7 +617,6 @@ namespace SER.Utilitties.NetCore.Services
         /// <param name="serialize">If true, serializes the result (not currently used).</param>
         /// <param name="connection">Optional connection string to use; if null, uses the default connection.</param>
         /// <param name="prefix">Optional prefix for query customization.</param>
-        /// <param name="whereArgs">Optional WHERE clause arguments for query customization.</param>
         /// <param name="locationClauseWhere"> 0 -> antes del group by, 1 -> despues del group by , 2 -> despues del order by. Default 0</param>
         /// <returns>
         /// A task representing the asynchronous operation. The result is either a JSON string or a dynamic object,
@@ -634,8 +633,6 @@ namespace SER.Utilitties.NetCore.Services
 
             StringBuilder sb = new();
             PagedResultBase pageResult = null;
-
-            Params ??= new Dictionary<string, object>();
 
             try
             {
@@ -768,7 +765,6 @@ namespace SER.Utilitties.NetCore.Services
                 // Pagination
                 if ((_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("page")) && allowQueryCollection) || !string.IsNullOrEmpty(pageStr))
                 {
-                    // parameters ??= new Dictionary<string, object>();
                     pageResult = new PagedResultBase();
                     pagination = true;
 
@@ -920,7 +916,7 @@ namespace SER.Utilitties.NetCore.Services
 
         private static string GetQueryWithWhere(string query, string clauseWhere, Dictionary<string, object> Params, bool skipClauseWhere = false)
         {
-            if (!Params.Any())
+            if (Params == null)
             {
                 if (!string.IsNullOrEmpty(clauseWhere) && !skipClauseWhere) query = string.Format("{0}\nWHERE {1}", query, clauseWhere);
                 else if (!string.IsNullOrEmpty(clauseWhere) && skipClauseWhere) query = string.Format("{0}\nAND {1}", query, clauseWhere);
