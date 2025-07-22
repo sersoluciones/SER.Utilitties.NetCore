@@ -705,7 +705,9 @@ namespace SER.Utilitties.NetCore.Services
                 else if (currentClass.Equals("ApplicationRole"))
                     currentClass = "role";
 
-                var clauseWhere = Filter<E>(out Dictionary<string, object> ParamsRequest, prefix ?? currentClass.ToLower().First().ToString());
+                Dictionary<string, object> ParamsRequest = new();
+
+                var clauseWhere = !allowQueryCollection ? null : Filter<E>(out ParamsRequest, prefix ?? currentClass.ToLower().First().ToString());
                 foreach (var param in ParamsRequest)
                 {
                     parameters.Add(param.Key, param.Value);
@@ -801,7 +803,7 @@ namespace SER.Utilitties.NetCore.Services
 
                 }
 
-                 // se ubica el WHERE en la consulta despues de pagination
+                // se ubica el WHERE en la consulta despues de pagination
                 if (locationClauseWhere == 3)
                 {
                     query = GetQueryWithWhere(query, clauseWhere, Params, skipClauseWhere: skipClauseWhere);
