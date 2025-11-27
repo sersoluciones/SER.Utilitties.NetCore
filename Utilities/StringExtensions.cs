@@ -58,21 +58,59 @@ namespace SER.Utilitties.NetCore.Utilities
 
         public static string GenerateSlug(this string phrase, int limit = 0)
         {
-            string str = phrase.RemoveAccent().ToLower();
-            // invalid chars           
-            str = Regex.Replace(str, @"[^a-z0-9\s-]", "");
-            // convert multiple spaces into one space   
-            str = Regex.Replace(str, @"\s+", " ").Trim();
-            // cut and trim 
-            if (limit > 0) str = str.Substring(0, str.Length <= limit ? str.Length : limit).Trim();
-            str = Regex.Replace(str, @"\s", "-"); // hyphens   
+            if (string.IsNullOrWhiteSpace(phrase))
+                return string.Empty;
+
+            string str = phrase.RemoveAccent().ToLowerInvariant();
+
+            str = str.Replace("&", "and")
+                     .Replace("@", "at")
+                     .Replace("+", "plus")
+                     .Replace("#", "sharp")
+                     .Replace("%", "percent");
+
+            str = Regex.Replace(str, @"[^a-z0-9\s-]", "", RegexOptions.Compiled);
+            str = Regex.Replace(str, @"[\s-]+", "-", RegexOptions.Compiled).Trim('-');
+
+            if (limit > 0 && str.Length > limit)
+            {
+                // Truncar al límite
+                str = str.Substring(0, limit).Trim('-');
+                
+                // Buscar el último guión completo para no cortar palabras
+                int lastHyphenIndex = str.LastIndexOf('-');
+                if (lastHyphenIndex > 0)
+                {
+                    str = str.Substring(0, lastHyphenIndex);
+                }
+            }
+
+            str = Regex.Replace(str, @"-{2,}", "-", RegexOptions.Compiled).Trim('-');
+
             return str;
         }
 
         public static string RemoveAccent(this string txt)
         {
-            byte[] bytes = System.Text.Encoding.GetEncoding("Cyrillic").GetBytes(txt);
-            return System.Text.Encoding.ASCII.GetString(bytes);
+            if (string.IsNullOrWhiteSpace(txt))
+                return txt;
+
+            
+            string normalized = txt.Replace('ñ', 'n').Replace('Ñ', 'N');
+            normalized = normalized.Normalize(NormalizationForm.FormD);
+            
+            var stringBuilder = new StringBuilder();
+            foreach (char c in normalized)
+            {
+                var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+
+         
+            return stringBuilder.ToString().Normalize(NormalizationForm.FormC);
         }
 
         public static string RandomString(int length)
