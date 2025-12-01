@@ -63,11 +63,11 @@ namespace SER.Utilitties.NetCore.Utilities
 
             string str = phrase.RemoveAccent().ToLowerInvariant();
 
-            str = str.Replace("&", "and")
-                     .Replace("@", "at")
-                     .Replace("+", "plus")
-                     .Replace("#", "sharp")
-                     .Replace("%", "percent");
+            str = str.Replace("&", "")
+                     .Replace("@", "")
+                     .Replace("+", "")
+                     .Replace("#", "")
+                     .Replace("%", "");
 
             str = Regex.Replace(str, @"[^a-z0-9\s-]", "", RegexOptions.Compiled);
             str = Regex.Replace(str, @"[\s-]+", "-", RegexOptions.Compiled).Trim('-');
