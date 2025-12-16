@@ -9,13 +9,21 @@ using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Utilities
 {
+    public enum ImageFormat
+    {
+        Jpeg,
+        Png,
+        Gif
+    }
+
+
     public static class FormFileExtensions
     {
         public const int ImageMinimumBytes = 512;
 
         public static bool IsImage(this IFormFile postedFile, out ImageFormat imageFormat)
         {
-            imageFormat = null;
+            imageFormat = default;
             //-------------------------------------------
             //  Check the image mime types
             //-------------------------------------------
