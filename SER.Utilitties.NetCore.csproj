@@ -15,7 +15,7 @@
 		<PackageReference Include="Dapper" Version="2.1.66" />
 		
 		<PackageReference Include="Google.Apis.Auth" Version="1.57.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.17" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.17" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.6" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
