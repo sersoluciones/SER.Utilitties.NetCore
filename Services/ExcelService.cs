@@ -15,10 +15,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Dynamic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.Services
@@ -703,7 +705,7 @@ namespace SER.Utilitties.NetCore.Services
                 else Cells.Value = value.ToString();
 
                 Cells.Style.WrapText = wrapText;
-                if (key == "email")
+                if (key == "email" && IsValidEmail(value.ToString()))
                 {
                     Cells.Style.Font.UnderLine = true;
                     Cells.Style.Font.Color.SetColor(Color.Blue);
@@ -777,6 +779,54 @@ namespace SER.Utilitties.NetCore.Services
             else
             {
                 Cells.Value = value;
+            }
+        }
+
+        private const string PatternEmail =
+       @"^(([^<>()[\]\\.,;:\s@\""]+(\.[^<>()[\]\\.,;:\s@\""]+)*)|(\"".+\""))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$";
+
+
+        private static bool IsValidEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            try
+            {
+                // Normalize the domain
+                email = Regex.Replace(email, @"(@)(.+)$", DomainMapper,
+                                      RegexOptions.None, TimeSpan.FromMilliseconds(50));
+
+                // Examines the domain part of the email and normalizes it.
+                static string DomainMapper(Match match)
+                {
+                    // Use IdnMapping class to convert Unicode domain names.
+                    var idn = new IdnMapping();
+
+                    // Pull out and process domain name (throws ArgumentException on invalid)
+                    string domainName = idn.GetAscii(match.Groups[2].Value);
+
+                    return match.Groups[1].Value + domainName;
+                }
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            try
+            {
+                return Regex.IsMatch(email,
+                    PatternEmail,
+                    RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(50));
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
             }
         }
     }

@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
 		<Company>SER Soluciones</Company>
-		<Version>8.0.0</Version>
+		<Version>8.0.1</Version>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>
 			Utilities for Net 8 to make easier start any project
