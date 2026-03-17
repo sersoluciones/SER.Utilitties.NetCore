@@ -26,11 +26,11 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
 
         #endregion
 
-        public WhatsAppSender(ILogger<WhatsAppSender> logger, IConfiguration config)
+        public WhatsAppSender(ILogger<WhatsAppSender> logger, IConfiguration config, string? accessToken = null, string? phoneNumberId = null)
         {
             _config = config;
-            _accessToken = _config["WhatsAppAPI:token"];
-            _phoneNumberId = _config["WhatsAppAPI:phone_number_id"];
+            _accessToken = accessToken ?? _config["WhatsAppAPI:token"];
+            _phoneNumberId = phoneNumberId ?? _config["WhatsAppAPI:phone_number_id"];
             _client = new RestClient(_baseUrl);
             _logger = logger;
         }
@@ -43,7 +43,8 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         /// <param name="number"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public async Task SendSmsAsync(string number, string? message = null, string templateName = "sending_code", string language = "es")
+        public async Task SendSmsAsync(string number, string? message = null, string templateName = "sending_code", string language = "es",
+            string? accessToken = null, string? phoneNumberId = null)
         {
             var model = new MsgWhatsApp
             {
@@ -70,11 +71,11 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     }
                 }
             };
-            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
 
-        public async Task SendSmsAsync(string number, List<string> messages, string templateName, string language = "es")
+        public async Task SendSmsAsync(string number, List<string> messages, string templateName, string language = "es", string? accessToken = null, string? phoneNumberId = null)
         {
             var model = new MsgWhatsApp
             {
@@ -98,11 +99,11 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     }
                 }
             };
-            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
 
-        public async Task SendSmsAsync(string number, List<Component> components, string templateName, string language = "es")
+        public async Task SendSmsAsync(string number, List<Component> components, string templateName, string language = "es", string? accessToken = null, string? phoneNumberId = null)
         {
             var model = new MsgWhatsApp
             {
@@ -117,11 +118,11 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     Components = components.ToArray(),
                 }
             };
-            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
 
-        public async Task SendSmsAsync(string number, WInteractive interactive)
+        public async Task SendSmsAsync(string number, WInteractive interactive, string? accessToken = null, string? phoneNumberId = null)
         {
             var model = new MsgWhatsApp
             {
@@ -129,11 +130,11 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 Interactive = interactive,
                 Type = "interactive"
             };
-            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
 
-        public async Task SendSmsAsync(string number, WText text)
+        public async Task SendSmsAsync(string number, WText text, string? accessToken = null, string? phoneNumberId = null)
         {
             var model = new MsgWhatsApp
             {
@@ -141,13 +142,13 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 Text = text,
                 Type = "text"
             };
-            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
 
-        public async Task SendSmsAsync(object customObj)
+        public async Task SendSmsAsync(object customObj, string? accessToken = null, string? phoneNumberId = null)
         {
-            await Execute<ResponseWhatsApp>(MakePostRequest(customObj, endPoint: $"{_phoneNumberId}/messages"));
+            await Execute<ResponseWhatsApp>(MakePostRequest(customObj, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
         /// <summary>
@@ -155,7 +156,8 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         /// </summary>
         /// <param name="msgs"></param>
         /// <returns></returns>
-        public async Task SendingMultipleRequests(List<string> numbers, List<Component> components, string templateName, string language = "es")
+        public async Task SendingMultipleRequests(List<string> numbers, List<Component> components, string templateName, string language = "es",
+            string? accessToken = null, string? phoneNumberId = null)
         {
             var limit = 80; // limite de requests por minuto           
             var maxLimit = (int)Math.Ceiling(numbers.Count * 1.0 / limit * 1.0);
@@ -175,7 +177,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                 foreach (var number in requestToSend)
                 {
                     //_logger.LogInformation($" -------------------- enviando request {j} ------------------ ");
-                    await timeConstraint.Enqueue(() => SendSmsAsync(number, components, templateName, language).ConfigureAwait(false), CancellationToken.None);
+                    await timeConstraint.Enqueue(() => SendSmsAsync(number, components, templateName, language, accessToken, phoneNumberId).ConfigureAwait(false), CancellationToken.None);
                     j++;
                 }
 
@@ -187,14 +189,14 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
 
         }
 
-        private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "")
+        private RestRequest MakePostRequest(dynamic model, string endPoint = "", string baseUrl = "", string? accessToken = null)
         {
             if (!string.IsNullOrEmpty(baseUrl))
             {
                 _client = new RestClient(baseUrl);
             }
             var request = new RestRequest(endPoint, Method.Post);
-            request.AddHeader("authorization", string.Format("Bearer {0}", _accessToken));
+            request.AddHeader("authorization", string.Format("Bearer {0}", accessToken ?? _accessToken));
 
             string jsonString = JsonSerializer.Serialize(model);
             _logger.LogInformation($" ---------------- BODY {jsonString} -----------------");
