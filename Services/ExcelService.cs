@@ -18,6 +18,7 @@ using System.Dynamic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -559,7 +560,7 @@ namespace SER.Utilitties.NetCore.Services
                 {
                     using (ExcelRange Cells = Worksheet.Cells[param.Row, column])
                     {
-                        Cells.Value = param.Value.FirstCharToUpper();
+                        Cells.Value = string.IsNullOrEmpty(param.Value) ? param.Key : param.Value.FirstCharToUpper();
                         Cells.Style.Font.Bold = param.HeaderFontBold;
                         if (param.HeaderFontColor != null)
                             Cells.Style.Font.Color.SetColor(param.HeaderFontColor.Value);
@@ -580,7 +581,7 @@ namespace SER.Utilitties.NetCore.Services
                     if (param.CustomRow != null)
                     {
                         using ExcelRange Cells = Worksheet.Cells[param.CustomRow.Row, column];
-                        Cells.Value = param.CustomRow.Value.FirstCharToUpper();
+                        Cells.Value = string.IsNullOrEmpty(param.CustomRow.Value) ? param.Key : param.CustomRow.Value.FirstCharToUpper();
 
                         Cells.Style.Font.Bold = param.CustomRow.FontBold;
                         if (param.CustomRow.FontColor != null)
@@ -603,49 +604,173 @@ namespace SER.Utilitties.NetCore.Services
 
                 Row = sizeHeader + 1;
 
-                foreach (var item in items)
+                // Pre-compute per-column metadata once, outside the item loop.
+                // Previously typeof(M).GetProperties() was called inside the innermost loop,
+                // causing O(rows x cols^2) reflection overhead (e.g. 70k rows x 30 cols = 2M+ calls).
+                // Now it runs exactly once: O(cols).
+                bool isExpandoObject = typeof(M) == typeof(ExpandoObject);
+                PropertyInfo[] allProps = isExpandoObject ? new PropertyInfo[0] : typeof(M).GetProperties();
+
+                // Build list of (CustomColumnExcel, PropertyInfo, Type) — all resolved up front
+                var columnMeta = new List<Tuple<CustomColumnExcel, PropertyInfo, Type>>(columns.Count);
+                foreach (var col in columns)
                 {
-                    column = 1;
-                    foreach (var key in columns.Select(x => x.Key))
+                    PropertyInfo prop = null;
+                    Type unwrappedType = null;
+
+                    if (!isExpandoObject)
                     {
-                        using (ExcelRange Cells = Worksheet.Cells[Row, column])
+                        for (int ci = 0; ci < allProps.Length; ci++)
                         {
-                            var prop = typeof(M).GetProperties().FirstOrDefault(x => x.Name == key);
-
-                            if (prop != null)
-                            {
-                                var type = prop.PropertyType;
-                                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-                                    type = type.GetGenericArguments()[0];
-
-                                var value = prop.GetValue(item);
-                                RenderRow(Cells, key, value, type, columns.FirstOrDefault(x => x.Key == key), wrapText);
-                            }
-                            else if (typeof(M) == typeof(ExpandoObject))
-                            {
-                                Worksheet.Row(Row).CustomHeight = true;
-
-                                IDictionary<string, object> propertyValues = item as ExpandoObject;
-
-                                var property = propertyValues.FirstOrDefault(x => x.Key == key);
-                                RenderRow(Cells, property.Key, propertyValues[property.Key], propertyValues[property.Key]?.GetType(), columns.FirstOrDefault(x => x.Key == key), wrapText);
-
-                            }
+                            if (allProps[ci].Name == col.Key) { prop = allProps[ci]; break; }
                         }
-
-                        column++;
+                        if (prop != null)
+                        {
+                            unwrappedType = prop.PropertyType;
+                            if (unwrappedType.IsGenericType && unwrappedType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                                unwrappedType = unwrappedType.GetGenericArguments()[0];
+                        }
                     }
 
-                    Row++;
+                    columnMeta.Add(Tuple.Create(col, prop, unwrappedType));
                 }
+
+                int dataStartRow = Row;
+                int itemCount = items.Count;
+                int colCount = columnMeta.Count;
+
+                // Determine which column indices need per-cell hyperlink treatment
+                var hyperlinkColIndices = new HashSet<int>();
+                for (int ci = 0; ci < colCount; ci++)
+                {
+                    var k = columnMeta[ci].Item1.Key;
+                    if (k == "email" || k == "image" || k == "attachment_id")
+                        hyperlinkColIndices.Add(ci);
+                }
+
+                if (itemCount > 0)
+                {
+                    // -------------------------------------------------------
+                    // Phase 1: build the value matrix in pure C# (no EPPlus
+                    //          objects, no per-cell ExcelRange allocations).
+                    // -------------------------------------------------------
+                    var matrix = new object[itemCount, colCount];
+
+                    for (int r = 0; r < itemCount; r++)
+                    {
+                        var item = items[r];
+                        for (int ci = 0; ci < colCount; ci++)
+                        {
+                            var col = columnMeta[ci].Item1;
+                            var prop = columnMeta[ci].Item2;
+                            var unwrappedType = columnMeta[ci].Item3;
+
+                            object raw;
+                            if (prop != null)
+                            {
+                                raw = prop.GetValue(item);
+                            }
+                            else if (isExpandoObject)
+                            {
+                                IDictionary<string, object> expando = item as ExpandoObject;
+                                raw = expando.ContainsKey(col.Key) ? expando[col.Key] : null;
+                            }
+                            else
+                            {
+                                raw = null;
+                            }
+
+                            matrix[r, ci] = CoerceCellValue(raw, unwrappedType ?? raw?.GetType());
+                        }
+                    }
+
+                    // -------------------------------------------------------
+                    // Phase 2: write entire data block in ONE EPPlus call.
+                    // -------------------------------------------------------
+                    Worksheet.Cells[dataStartRow, 1, dataStartRow + itemCount - 1, colCount].Value = matrix;
+
+                    // -------------------------------------------------------
+                    // Phase 3: per-column styles and number formats
+                    //          (1 range call per column, not 1 per cell).
+                    // -------------------------------------------------------
+                    for (int ci = 0; ci < colCount; ci++)
+                    {
+                        var col = columnMeta[ci].Item1;
+                        var type = columnMeta[ci].Item3;
+                        var colRange = Worksheet.Cells[dataStartRow, ci + 1, dataStartRow + itemCount - 1, ci + 1];
+
+                        if (col.FontBold) colRange.Style.Font.Bold = true;
+                        if (col.FontColor != null) colRange.Style.Font.Color.SetColor(col.FontColor.Value);
+                        if (col.BackgroundColor != null)
+                        {
+                            colRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                            colRange.Style.Fill.BackgroundColor.SetColor(col.BackgroundColor.Value);
+                        }
+                        if (wrapText) colRange.Style.WrapText = true;
+
+                        if (type == typeof(decimal))
+                            colRange.Style.Numberformat.Format = col.CellFormat ?? "$#,##0.00";
+                        else if (type == typeof(double))
+                            colRange.Style.Numberformat.Format = col.CellFormat ?? "#,###0.00";
+                        else if (type == typeof(float))
+                            colRange.Style.Numberformat.Format = col.CellFormat ?? "#,###0.0";
+                        else if (type == typeof(DateTime))
+                            colRange.Style.Numberformat.Format = col.CellFormat ?? "dd/mm/yyyy HH:MM";
+                    }
+
+                    // -------------------------------------------------------
+                    // Phase 4: hyperlinks — only iterate rows for columns
+                    //          that actually need them (usually 0-2 columns).
+                    // -------------------------------------------------------
+                    if (hyperlinkColIndices.Count > 0)
+                    {
+                        for (int r = 0; r < itemCount; r++)
+                        {
+                            var item = items[r];
+                            foreach (int ci in hyperlinkColIndices)
+                            {
+                                var col = columnMeta[ci].Item1;
+                                var prop = columnMeta[ci].Item2;
+
+                                object raw = prop != null ? prop.GetValue(item) : null;
+                                if (isExpandoObject && raw == null)
+                                {
+                                    IDictionary<string, object> expando = item as ExpandoObject;
+                                    raw = expando.ContainsKey(col.Key) ? expando[col.Key] : null;
+                                }
+
+                                var strVal = raw?.ToString();
+                                if (string.IsNullOrEmpty(strVal)) continue;
+
+                                using var cell = Worksheet.Cells[dataStartRow + r, ci + 1];
+                                cell.Style.Font.UnderLine = true;
+                                cell.Style.Font.Color.SetColor(Color.Blue);
+                                if (col.Key == "email" && IsValidEmail(strVal))
+                                    cell.Hyperlink = new Uri("mailto:" + strVal, UriKind.Absolute);
+                                else
+                                    cell.Hyperlink = new Uri(strVal, UriKind.Absolute);
+                            }
+                        }
+                    }
+                }
+
+                Row = dataStartRow + itemCount;
 
                 if (generalWidth > 0)
                     Worksheet.Cells[Worksheet.Dimension.Address].EntireColumn.Width = generalWidth;
                 if (generalHeight > 0)
                     Worksheet.Cells[Worksheet.Dimension.Address].EntireRow.Height = generalHeight;
 
+                // AutoFitColumns is O(rows×cols) — skip for large datasets to avoid
+                // adding another 10-20 s of processing on files with thousands of rows.
+                const int autoFitThreshold = 5_000;
                 if (autoFitColumns && Row > 1)
-                    Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
+                {
+                    if (items.Count <= autoFitThreshold)
+                        Worksheet.Cells[Worksheet.Dimension.Address].AutoFitColumns();
+                    else
+                        Worksheet.Cells[Worksheet.Dimension.Address].EntireColumn.Width = 22;
+                }
 
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                 Worksheet.Cells[Worksheet.Dimension.Address].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
@@ -677,6 +802,28 @@ namespace SER.Utilitties.NetCore.Services
                 return bytes;
             else
                 return stream;
+        }
+
+        /// <summary>
+        /// Converts a raw CLR value into its Excel-friendly representation.
+        /// No EPPlus objects are created here — this is pure value mapping used
+        /// by the bulk-write path to populate the 2D value matrix.
+        /// </summary>
+        private static object CoerceCellValue(object value, Type type)
+        {
+            if (value is null) return "-";
+
+            if (type == typeof(string))
+            {
+                var s = value.ToString();
+                return string.IsNullOrEmpty(s) ? "-" : s;
+            }
+
+            if (type == typeof(bool))
+                return (bool)value ? "Si" : "No";
+
+            // DateTime, int, double, decimal, float — EPPlus handles them natively
+            return value;
         }
 
         private static void RenderRow(ExcelRange Cells, string key, object value, Type type, CustomColumnExcel customColumnExcel, bool wrapText)
