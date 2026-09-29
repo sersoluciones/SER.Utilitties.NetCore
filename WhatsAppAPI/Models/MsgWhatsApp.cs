@@ -66,6 +66,18 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("type")]
         public string Type { get; set; } = "text";
 
+        /// <summary>
+        /// Placeholder this value fills, for templates whose body uses named variables (<c>{{name}}</c>).
+        /// </summary>
+        /// <remarks>
+        /// Meta refuses a named-parameter template with «Parameter name is missing or empty» when the
+        /// payload omits it. Left null for positional templates, and omitted from the JSON when null so
+        /// the templates that already work keep sending exactly what they sent before.
+        /// </remarks>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("parameter_name")]
+        public string? ParameterName { get; set; }
+
         [JsonPropertyName("text")]
         public string? Text { get; set; }
 
