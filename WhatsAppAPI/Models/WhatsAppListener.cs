@@ -148,6 +148,99 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         /// <summary>Present when <see cref="Type"/> is <c>system</c>, such as a user changing number or BSUID.</summary>
         [JsonPropertyName("system")]
         public WSystem? System { get; set; }
+
+        /// <summary>Present when <see cref="Type"/> is <c>unsupported</c>: says which kind of message Cloud API could not render.</summary>
+        [JsonPropertyName("unsupported")]
+        public WUnsupported? Unsupported { get; set; }
+
+        /// <summary>Why the message could not be processed, typically alongside <see cref="Unsupported"/>.</summary>
+        [JsonPropertyName("errors")]
+        public WStatusError[]? Errors { get; set; }
+
+        /// <summary>Click-to-WhatsApp ad or post the user came from.</summary>
+        [JsonPropertyName("referral")]
+        public WReferral? Referral { get; set; }
+
+        [JsonPropertyName("image")]
+        public WMedia? Image { get; set; }
+
+        [JsonPropertyName("audio")]
+        public WMedia? Audio { get; set; }
+
+        [JsonPropertyName("video")]
+        public WMedia? Video { get; set; }
+
+        [JsonPropertyName("document")]
+        public WMedia? Document { get; set; }
+
+        [JsonPropertyName("sticker")]
+        public WMedia? Sticker { get; set; }
+
+        /// <summary>The media object of an image, audio, video, document or sticker message.</summary>
+        [JsonIgnore]
+        public WMedia? Media => Image ?? Audio ?? Video ?? Document ?? Sticker;
+    }
+
+    /// <summary>
+    /// A file the user sent. <see cref="Id"/> is exchanged for a download URL at <c>GET /{media-id}</c>, valid five
+    /// minutes and fetched with the line's token; the id itself stays retrievable for seven days.
+    /// </summary>
+    public partial class WMedia
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("mime_type")]
+        public string? MimeType { get; set; }
+
+        /// <summary>Base64 SHA-256 of the file.</summary>
+        [JsonPropertyName("sha256")]
+        public string? Sha256 { get; set; }
+
+        [JsonPropertyName("caption")]
+        public string? Caption { get; set; }
+
+        /// <summary>Original file name of a document.</summary>
+        [JsonPropertyName("filename")]
+        public string? Filename { get; set; }
+
+        /// <summary>The audio is a voice note recorded in WhatsApp.</summary>
+        [JsonPropertyName("voice")]
+        public bool? Voice { get; set; }
+
+        [JsonPropertyName("animated")]
+        public bool? Animated { get; set; }
+    }
+
+    /// <summary>
+    /// Kind of an unrenderable message. <c>hsm</c>, <c>interactive</c>, <c>button</c>, <c>list</c> and <c>product</c>
+    /// arrive when the sender is itself a business on the API.
+    /// </summary>
+    public partial class WUnsupported
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
+    }
+
+    public partial class WReferral
+    {
+        [JsonPropertyName("source_url")]
+        public string? SourceUrl { get; set; }
+
+        [JsonPropertyName("source_type")]
+        public string? SourceType { get; set; }
+
+        [JsonPropertyName("source_id")]
+        public string? SourceId { get; set; }
+
+        [JsonPropertyName("headline")]
+        public string? Headline { get; set; }
+
+        [JsonPropertyName("body")]
+        public string? Body { get; set; }
+
+        [JsonPropertyName("ctwa_clid")]
+        public string? CtwaClid { get; set; }
     }
 
     public partial class Text
@@ -213,8 +306,17 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("from")]
         public string? From { get; set; }
 
+        /// <summary>wamid of the message being replied to, when the user quoted it or tapped one of its buttons.</summary>
         [JsonPropertyName("id")]
         public string? Id { get; set; }
+
+        /// <summary>The message was forwarded (up to five times).</summary>
+        [JsonPropertyName("forwarded")]
+        public bool? Forwarded { get; set; }
+
+        /// <summary>The message was forwarded more than five times.</summary>
+        [JsonPropertyName("frequently_forwarded")]
+        public bool? FrequentlyForwarded { get; set; }
     }
 
     /// <summary>
