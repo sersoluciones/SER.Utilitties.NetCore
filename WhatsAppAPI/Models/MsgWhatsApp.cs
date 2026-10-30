@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
@@ -15,8 +16,35 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI.Models
         [JsonPropertyName("messaging_product")]
         public string MessagingProduct { get; set; } = "whatsapp";
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("to")]
         public string? To { get; set; }
+
+        /// <summary>Business-scoped user id (BSUID) of the recipient. Meta uses <see cref="To"/> when both are set.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("recipient")]
+        public string? Recipient { get; set; }
+
+        /// <summary>
+        /// Addresses the message to a phone number or to a BSUID (<c>CO.2208218207240616</c>), whichever
+        /// <paramref name="id"/> is. Users with a WhatsApp username may only be reachable by BSUID.
+        /// </summary>
+        public MsgWhatsApp SetRecipient(string id)
+        {
+            if (BsuidPattern.IsMatch(id))
+            {
+                Recipient = id;
+                To = null;
+            }
+            else
+            {
+                To = id;
+                Recipient = null;
+            }
+            return this;
+        }
+
+        private static readonly Regex BsuidPattern = new(@"^[A-Z]{2}\.[A-Za-z0-9]+$", RegexOptions.Compiled);
 
         [JsonPropertyName("type")]
         public string Type { get; set; } = "template";

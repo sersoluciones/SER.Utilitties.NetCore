@@ -48,7 +48,6 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         {
             var model = new MsgWhatsApp
             {
-                To = number,
                 Template = new Template
                 {
                     Name = templateName,
@@ -71,6 +70,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     }
                 }
             };
+            model.SetRecipient(number);
             return await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
@@ -79,7 +79,6 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         {
             var model = new MsgWhatsApp
             {
-                To = number,
                 Template = new Template
                 {
                     Name = templateName,
@@ -99,6 +98,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     }
                 }
             };
+            model.SetRecipient(number);
             return await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
@@ -107,7 +107,6 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         {
             var model = new MsgWhatsApp
             {
-                To = number,
                 Template = new Template
                 {
                     Name = templateName,
@@ -118,6 +117,7 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
                     Components = components.ToArray(),
                 }
             };
+            model.SetRecipient(number);
             return await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
@@ -126,10 +126,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         {
             var model = new MsgWhatsApp
             {
-                To = number,
                 Interactive = interactive,
                 Type = "interactive"
             };
+            model.SetRecipient(number);
             return await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
@@ -138,10 +138,10 @@ namespace SER.Utilitties.NetCore.WhatsAppAPI
         {
             var model = new MsgWhatsApp
             {
-                To = number,
                 Text = text,
                 Type = "text"
             };
+            model.SetRecipient(number);
             return await Execute<ResponseWhatsApp>(MakePostRequest(model, endPoint: $"{phoneNumberId ?? _phoneNumberId}/messages", accessToken: accessToken ?? _accessToken));
         }
 
