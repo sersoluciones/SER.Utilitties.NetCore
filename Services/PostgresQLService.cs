@@ -142,6 +142,7 @@ namespace SER.Utilitties.NetCore.Services
             if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("filter_by")))
             {
                 var columnStr = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("filter_by")).Value.ToString();
+                if (string.IsNullOrWhiteSpace(columnStr)) return expresion.ToString();
                 string pattern = @"\/|\|";
                 string[] columns = Regex.Split(columnStr, pattern);
                 var properties = new Dictionary<string, Type>();
@@ -204,6 +205,10 @@ namespace SER.Utilitties.NetCore.Services
 
                     var patternStr = @"\=|¬|<=|>=|>|<";
                     string[] value = Regex.Split(column, patternStr);
+                    // la columna va pegada al SQL (el valor va como parámetro): solo columna, alias.columna o all
+                    if (value.Length < 2 || !SqlQueryFilter.IsSafeFilterColumn(value[0]))
+                        throw new InvalidQueryFilterException("filter_by", column);
+                    value[0] = value[0].Trim();
                     if (string.IsNullOrEmpty(value[1])) break;
 
                     //initialClass = currentClass.ToLower().First().ToString() + ".";
@@ -841,6 +846,9 @@ namespace SER.Utilitties.NetCore.Services
                 if (_contextAccessor.HttpContext.Request.Query.Any(x => x.Key.Equals("order_by")))
                 {
                     OrderBy = _contextAccessor.HttpContext.Request.Query.FirstOrDefault(x => x.Key.Equals("order_by")).Value.ToString();
+                    // va pegado al SQL: solo columnas con asc/desc (vacío = sin orden, como antes)
+                    if (!string.IsNullOrWhiteSpace(OrderBy))
+                        OrderBy = SqlQueryFilter.SanitizeOrderBy(OrderBy) ?? throw new InvalidQueryFilterException("order_by", OrderBy);
                     //var initialClass = currentClass.ToLower().First();
                     string pattern = "\\.";
                     Match match = Regex.Match(OrderBy, pattern);
